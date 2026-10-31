@@ -2,7 +2,7 @@
  * Peta `kid` -> kunci publik penanda tangan lisensi.
  *
  * Kunci PUBLIK aman ditulis di kode, walau reponya nanti dibuka: yang bisa menerbitkan
- * lisensi cuma pemegang kunci PRIVAT (ada di qendali.com, di luar repo). Yang di sini
+ * lisensi cuma pemegang kunci PRIVAT (ada di qaloka.com, di luar repo). Yang di sini
  * hanya bisa dipakai untuk MEMERIKSA.
  *
  * Rotasi kunci (lihat `docs/lisensi.md` di repo qendali): terbitkan `prod-2`, tambahkan
@@ -19,7 +19,7 @@ MCowBQYDK2VwAyEAMWh3dXB910jHpVpqzXNivcJ+SxC1oJox/sTa4kcdOwc=
 
 /**
  * Kunci PRODUKSI, terbit 26 Sep 2026. Yang menandatangani lisensi klien sungguhan.
- * Privatnya ada di mesin penerbit qendali.com dan tidak pernah masuk repo mana pun.
+ * Privatnya ada di mesin penerbit qaloka.com dan tidak pernah masuk repo mana pun.
  */
 const PROD_1 = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAO+g//5WH0sDGJCoH0f5yddTr42oB8uRZNGR/odFCwIY=

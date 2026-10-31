@@ -1,7 +1,7 @@
 /**
  * Tempat menyimpan kunci lisensi di instalasi klien.
  *
- * Disalin 11 Okt 2026 dari Qendali POS (backend/src/lisensi/simpanan-lisensi.ts).
+ * Disalin 11 Okt 2026 dari Qaloka POS (backend/src/lisensi/simpanan-lisensi.ts).
  *
  * Kenapa BERKAS, bukan tabel database:
  * - Menambah tabel berarti satu migrasi lagi di tiap instalasi yang sudah jalan, untuk sesuatu
@@ -19,7 +19,7 @@ import { promises as fs } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export interface Simpanan {
-    /** Kunci `q1.<isi>.<tanda tangan>`, apa adanya seperti yang dikirim qendali.com. */
+    /** Kunci `q1.<isi>.<tanda tangan>`, apa adanya seperti yang dikirim qaloka.com. */
     kunci: string | null;
     /** Stempel UTC penyegaran TERAKHIR YANG BERHASIL — penangkal jam mesin yang dimundurkan. */
     terakhirTerlihat: string | null;

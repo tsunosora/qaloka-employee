@@ -307,7 +307,7 @@ export default function SettingsPage() {
                 }
               >
                 <option value="default">Standard</option>
-                <option value="rate_my_staff_custom">Qendali (kustom)</option>
+                <option value="rate_my_staff_custom">Qaloka (kustom)</option>
               </select>
             </label>
             <label className="flex items-center gap-2 text-muted">

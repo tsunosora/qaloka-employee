@@ -54,7 +54,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
-    // Tiket masuk `qm1` dari portal qendali.com (/masuk-qendali). Gagal-tertutup; aturannya di
+    // Tiket masuk `qm1` dari portal qaloka.com (/masuk-qendali). Gagal-tertutup; aturannya di
     // lib/lisensi/tiket-masuk.ts. Peran diambil dari akun di sini, tidak pernah dari tiket.
     Credentials({
       id: "qendali-tiket",

@@ -282,7 +282,7 @@ export async function terimaHasil(
     if (pins.size === 0 && jumlahDiMesin > 0) {
       await prisma.fingerspotPerintah.update({
         where: { id: p.id },
-        data: { status: "gagal", catatan: `Mesin punya ${jumlahDiMesin} user, tapi daftar PIN-nya belum bisa dibaca. Laporkan ke Qendali.` },
+        data: { status: "gagal", catatan: `Mesin punya ${jumlahDiMesin} user, tapi daftar PIN-nya belum bisa dibaca. Laporkan ke Qaloka.` },
       });
       return { cmdCode: p.cmdCode, ok: false };
     }

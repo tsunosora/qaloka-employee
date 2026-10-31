@@ -1,5 +1,5 @@
-// Penanda merek Qendali: huruf Q dari 11 modul + satu blok oranye sebagai ekor.
-// Geometrinya DISALIN dari LogoMark situs qendali.com (components/Icons.jsx), yang diukur dari
+// Penanda merek Qaloka: huruf Q dari 11 modul + satu blok oranye sebagai ekor.
+// Geometrinya DISALIN dari LogoMark situs qaloka.com (components/Icons.jsx), yang diukur dari
 // berkas logo resmi — jangan digambar ulang "mirip". Kalau logonya berubah, salin ulang dari sana.
 // Modulnya memakai currentColor supaya ikut warna ubinnya; ekornya tetap oranye merek.
 
@@ -17,7 +17,7 @@ const MODUL: [number, number, number, number, number][] = [
   [36.3, 72.74, 15.85, 15.85, 3.33],
 ];
 
-export function QendaliMark({ className = "" }: { className?: string }) {
+export function QalokaMark({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={className} aria-hidden="true" focusable="false">
       <g fill="currentColor">
@@ -31,7 +31,7 @@ export function QendaliMark({ className = "" }: { className?: string }) {
 }
 
 /** Nama produk yang tampil ke pengguna. Nama internal (proses PM2, database, kunci) TIDAK ikut. */
-export const NAMA_PRODUK = "Qendali Employee";
+export const NAMA_PRODUK = "Qaloka Employee";
 
 /** Ubin logo: modul putih di atas ubin merek, ekor oranye. */
 export function UbinLogo({ besar = false }: { besar?: boolean }) {
@@ -39,16 +39,16 @@ export function UbinLogo({ besar = false }: { besar?: boolean }) {
     <span
       className={`grid ${besar ? "h-11 w-11" : "h-9 w-9"} shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-white shadow-lg shadow-primary/30`}
     >
-      <QendaliMark className={besar ? "h-6 w-6" : "h-5 w-5"} />
+      <QalokaMark className={besar ? "h-6 w-6" : "h-5 w-5"} />
     </span>
   );
 }
 
-/** "Qendali Employee" — nama merek tebal, kata produknya berwarna primer. */
+/** "Qaloka Employee" — nama merek tebal, kata produknya berwarna primer. */
 export function NamaMerek({ className = "" }: { className?: string }) {
   return (
     <span className={`font-display font-bold tracking-tight text-fg ${className}`}>
-      Qendali <span className="text-primary">Employee</span>
+      Qaloka <span className="text-primary">Employee</span>
     </span>
   );
 }

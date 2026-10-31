@@ -19,7 +19,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Qendali Employee",
+  title: "Qaloka Employee",
   description: "Absensi, penilaian, dan kinerja karyawan.",
   // Aplikasi internal — jangan diindeks mesin pencari.
   robots: {

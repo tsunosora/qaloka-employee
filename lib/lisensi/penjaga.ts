@@ -20,12 +20,12 @@ import { KODE_BATAS_DITEGAKKAN, putusanBatas, type PutusanBatas } from "./aturan
 export function pesanHanyaBaca(alasan: string | null): string {
   const sebab =
     alasan === "masa_berlaku_habis"
-      ? "Lisensi Qendali sudah habis masa berlakunya"
-      : "Kunci lisensi Qendali tidak cocok dengan instalasi ini";
+      ? "Lisensi Qaloka sudah habis masa berlakunya"
+      : "Kunci lisensi Qaloka tidak cocok dengan instalasi ini";
   const jalan =
     alasan === "masa_berlaku_habis"
-      ? "Perbarui langganan di qendali.com, lalu segarkan lisensinya dari Pengaturan → Langganan."
-      : "Hubungi tim Qendali supaya kuncinya diterbitkan ulang.";
+      ? "Perbarui langganan di qaloka.com, lalu segarkan lisensinya dari Pengaturan → Langganan."
+      : "Hubungi tim Qaloka supaya kuncinya diterbitkan ulang.";
   return (
     `${sebab}, jadi aplikasi sedang HANYA-BACA: data lama tetap bisa dibuka, dicari, dan ` +
     `diekspor, dan absensi dari mesin tetap masuk — tapi data baru belum bisa disimpan dari layar. ${jalan}`
@@ -68,7 +68,7 @@ export async function tolakOlehLisensi(req: Request): Promise<Response | null> {
   if (fitur && !bolehFitur(keadaan, fitur)) {
     const pesan =
       `Fitur ini tidak termasuk paket langganan yang terpasang (kode: ${fitur}). ` +
-      "Tambahkan lewat portal qendali.com, lalu segarkan kunci lisensinya.";
+      "Tambahkan lewat portal qaloka.com, lalu segarkan kunci lisensinya.";
     return NextResponse.json(
       { statusCode: 403, error: "Forbidden", kode: "lisensi_fitur_tidak_ada", fitur: [fitur], message: pesan },
       { status: 403 },

@@ -5,7 +5,7 @@ import { keadaanLisensi } from "@/lib/lisensi/layanan";
 
 /**
  * GET /api/hp/ringkasan — beranda Tim di aplikasi HP Owner: ringkasan HR yang sama dengan kartu
- * di Qendali POS, ditambah antrean yang menunggu keputusan owner dan fitur lisensi aktif.
+ * di Qaloka POS, ditambah antrean yang menunggu keputusan owner dan fitur lisensi aktif.
  * Rincian & keputusan memakai API dasbor biasa (/api/attendance/report, /api/leave-requests,
  * /api/redemptions) dengan token HP yang sama.
  */

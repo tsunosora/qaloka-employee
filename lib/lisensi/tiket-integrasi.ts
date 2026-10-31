@@ -1,7 +1,7 @@
 /**
- * Tiket integrasi antarproduk Qendali (amplop `qi1`) — dua arah:
- *   - `periksaTiketIntegrasi()` : MENERIMA panggilan dari Qendali POS (kartu absensi di beranda kasir).
- *   - `tiketUntuk()`             : MEMINTA tiket ke qendali.com untuk memanggil Qendali POS (KPI staf).
+ * Tiket integrasi antarproduk Qaloka (amplop `qi1`) — dua arah:
+ *   - `periksaTiketIntegrasi()` : MENERIMA panggilan dari Qaloka POS (kartu absensi di beranda kasir).
+ *   - `tiketUntuk()`             : MEMINTA tiket ke qaloka.com untuk memanggil Qaloka POS (KPI staf).
  *
  * Acuannya `lib/tiket-integrasi.mjs` + docs/lisensi.md → "Tiket integrasi" di repo qendali.
  * Pemeriksaannya GAGAL-TERTUTUP — beda dengan penegakan lisensi yang gagal-terbuka: yang dijaga di
@@ -14,7 +14,7 @@ import { PRODUK_APLIKASI } from "./keadaan-lisensi";
 
 export const AMPLOP_INTEGRASI = "qi1";
 const VERSI = 1;
-/** Pasangan yang boleh memanggil aplikasi ini — cermin `PASANGAN` di qendali.com (ada di kontrak). */
+/** Pasangan yang boleh memanggil aplikasi ini — cermin `PASANGAN` di qaloka.com (ada di kontrak). */
 export const BOLEH_DARI = ["qendali"];
 
 export type HasilTiket =
@@ -66,7 +66,7 @@ export async function periksaTiketIntegrasi(tiket: string): Promise<HasilTiket> 
   return periksaTiketMurni(tiket, { kunciPublik: kunciPublikLisensi(), produkSaya: PRODUK_APLIKASI, klienSaya });
 }
 
-/** Ambil tiket dari header, atau null kalau headernya bukan skema Qendali. */
+/** Ambil tiket dari header, atau null kalau headernya bukan skema Qaloka. */
 export function tiketDariHeader(req: Request): string | null {
   const auth = req.headers.get("authorization") ?? "";
   return /^qendali\s+/i.test(auth) ? auth.replace(/^qendali\s+/i, "").trim() : null;
@@ -81,14 +81,14 @@ const simpanan = (g.__qendaliTiketKeluar ??= new Map());
 const SISA_MIN_MS = 60_000;
 /**
  * Kegagalan juga diingat sebentar. Tanpa ini, usaha yang memang tidak berlangganan produk tujuan
- * membuat tiap panggilan bertanya ulang ke qendali.com — kartu yang dimuat tiap 15 detik jadi
+ * membuat tiap panggilan bertanya ulang ke qaloka.com — kartu yang dimuat tiap 15 detik jadi
  * 4 permintaan per menit ke penerbit, untuk jawaban yang sama.
  */
 const INGAT_GAGAL_MS = 5 * 60_000;
 
 /**
  * Tiket untuk memanggil produk `ke` milik usaha yang sama. null = tidak bisa (token belum
- * dipasang, qendali.com tidak terjangkau, atau usaha ini tidak berlangganan produk tujuan) —
+ * dipasang, qaloka.com tidak terjangkau, atau usaha ini tidak berlangganan produk tujuan) —
  * pemanggil lalu jatuh ke kunci API lama kalau ada.
  */
 export async function tiketUntuk(ke: string): Promise<string | null> {
@@ -109,7 +109,7 @@ export async function tiketUntuk(ke: string): Promise<string | null> {
     });
     const badan = (await res.json().catch(() => ({}))) as { tiket?: string; kedaluwarsaPada?: string; salah?: string };
     if (!res.ok || !badan.tiket) {
-      console.warn(`[integrasi] tiket ke ${ke} ditolak qendali.com: ${res.status} ${badan.salah ?? ""}`);
+      console.warn(`[integrasi] tiket ke ${ke} ditolak qaloka.com: ${res.status} ${badan.salah ?? ""}`);
       simpanan.set(ke, { tiket: null, habis: Date.now() + INGAT_GAGAL_MS });
       return null;
     }

@@ -1,4 +1,4 @@
-// Lisensi Qendali Employee: verifikasi kunci, keadaan, batas, dan peta jalur → fitur.
+// Lisensi Qaloka Employee: verifikasi kunci, keadaan, batas, dan peta jalur → fitur.
 // Bagian murni diuji langsung; penegakannya (route()) dijaga secara struktural di bawah.
 import { generateKeyPairSync, sign } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -75,8 +75,8 @@ describe("keadaan lisensi", () => {
     expect(habis.hanyaBaca).toBe(true);
   });
 
-  // Salinan POS masih `status !== 'aktif'`; acuannya (qendali.com) `=== 'kedaluwarsa'`.
-  test("statusMasaBerlaku.hanyaBaca ikut qendali.com: tenggang BUKAN hanya-baca", () => {
+  // Salinan POS masih `status !== 'aktif'`; acuannya (qaloka.com) `=== 'kedaluwarsa'`.
+  test("statusMasaBerlaku.hanyaBaca ikut qaloka.com: tenggang BUKAN hanya-baca", () => {
     const m = statusMasaBerlaku(
       { berlakuSampai: new Date(Date.now() - HARI).toISOString(), tenggangHari: 14 } as never,
       {},
@@ -146,7 +146,7 @@ const API_TERBUKA: Record<string, string> = {
   "/api/auth": "masuk & keluar",
   "/api/account/password": "ganti sandi sendiri",
   "/api/dashboard": "beranda, ada di semua paket",
-  "/api/hp/tiket-masuk": "masuk aplikasi HP Owner dengan tiket qendali.com",
+  "/api/hp/tiket-masuk": "masuk aplikasi HP Owner dengan tiket qaloka.com",
   "/api/hp/ringkasan": "beranda Tim aplikasi HP Owner, setara /api/dashboard",
   "/api/lisensi": "keadaan & penyegaran lisensi — jalan keluarnya",
   "/api/notifications": "notifikasi aplikasi",
@@ -159,7 +159,7 @@ const API_TERBUKA: Record<string, string> = {
 };
 const HALAMAN_TERBUKA: Record<string, string> = {
   "/login": "masuk",
-  "/masuk-qendali": "masuk dengan tiket dari portal qendali.com",
+  "/masuk-qendali": "masuk dengan tiket dari portal qaloka.com",
   "/dashboard": "beranda",
   "/settings": "pengaturan umum (kartu mesin & libur memanggil API yang dijaga sendiri)",
   "/settings/users": "akun pengguna",

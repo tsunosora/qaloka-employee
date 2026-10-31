@@ -37,7 +37,7 @@ describe("tiket integrasi", () => {
     expect(tiketDariHeader(new Request("http://x", { headers: { authorization: "Qendali abc" } }))).toBe("abc");
     expect(tiketDariHeader(new Request("http://x", { headers: { authorization: "Bearer abc" } }))).toBeNull();
   });
-  // Daftar yang boleh memanggil aplikasi ini harus SAMA dengan yang diterbitkan qendali.com.
+  // Daftar yang boleh memanggil aplikasi ini harus SAMA dengan yang diterbitkan qaloka.com.
   test("BOLEH_DARI cocok dengan kontrak", () => {
     const pemanggil = Object.entries((kontrak as unknown as { integrasi: Record<string, string[]> }).integrasi)
       .filter(([, ke]) => ke.includes("qendali_employee"))

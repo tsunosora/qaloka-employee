@@ -29,7 +29,7 @@ import {
     statusMasaBerlaku,
 } from './periksa-kunci';
 
-/** Produk yang boleh dipakai kunci di aplikasi INI (Qendali Employee). Kunci kasir/Event ditolak. */
+/** Produk yang boleh dipakai kunci di aplikasi INI (Qaloka Employee). Kunci kasir/Event ditolak. */
 export const PRODUK_APLIKASI = 'qendali_employee';
 
 /**
@@ -165,7 +165,7 @@ export function nilaiKeadaan({
         };
     }
 
-    // Kunci produk lain (mis. Qendali Event) wajib ditolak — isi fiturnya kosakata lain.
+    // Kunci produk lain (mis. Qaloka Event) wajib ditolak — isi fiturnya kosakata lain.
     if (hasil.isi.produk !== produkAplikasi) {
         return {
             ...KOSONG,

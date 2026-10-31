@@ -6,7 +6,7 @@
  * Keputusan owner (18 Okt 2026): satu orang satu baris per hari (Hadir / ½ Hari / Absen + lembur,
  * kota, divisi, proyek). Semua yang dicatat PIC MENUNGGU persetujuan owner/HR; baris yang sudah
  * disetujui lalu DIUBAH PIC kembali menunggu. Baris yang sudah DIBAYAR terkunci. PIC terakhir yang
- * menyimpan menang (sama dengan Qendali Event). Upah hanya dihitung dari baris yang disetujui —
+ * menyimpan menang (sama dengan Qaloka Event). Upah hanya dihitung dari baris yang disetujui —
  * hitungannya bukan di sini (lib/services/upah).
  */
 
@@ -122,7 +122,7 @@ export function putuskanBaris(lama: BarisLama | null, baru: IsiRekap): "buat" | 
 
 /**
  * Setiap orang di kiriman WAJIB anggota tim PIC ini (Employee.timId = tim), aktif, belum dihapus.
- * Tanpa pemeriksaan ini PIC bisa merekap siapa pun dengan menebak id — celah yang ada di Qendali
+ * Tanpa pemeriksaan ini PIC bisa merekap siapa pun dengan menebak id — celah yang ada di Qaloka
  * Event, sengaja tidak ditiru. Mengembalikan id yang DITOLAK (kosong = semua sah).
  */
 export function bukanAnggota(

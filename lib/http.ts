@@ -50,7 +50,7 @@ export function notFound(message = "Not found") {
  * Bungkus handler route: tangkap Response yang dilempar (mis. dari requireSession)
  * dan error tak terduga → 500. Menjaga tiap route tetap ringkas.
  *
- * Lisensi Qendali juga ditegakkan DI SINI (fitur per jalur + hanya-baca), jadi tiap route yang
+ * Lisensi Qaloka juga ditegakkan DI SINI (fitur per jalur + hanya-baca), jadi tiap route yang
  * memakai `route()` ikut tanpa harus ingat memanggilnya. Gagal-terbuka: tanpa kunci lisensi,
  * tidak ada yang ditolak. Lihat lib/lisensi/penjaga.ts.
  */

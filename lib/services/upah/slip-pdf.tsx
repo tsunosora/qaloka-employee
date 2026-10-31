@@ -154,7 +154,7 @@ function Slip({ d }: { d: DataSlip }) {
           <Text>{d.karyawan.nama}</Text>
         </View>
       </View>
-      <Text style={s.catatan}>Dibuat {d.dibuatAt} · Qendali Employee</Text>
+      <Text style={s.catatan}>Dibuat {d.dibuatAt} · Qaloka Employee</Text>
     </Page>
   );
 }

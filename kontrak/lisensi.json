@@ -29,22 +29,22 @@
   "produk": [
     {
       "kode": "qendali",
-      "nama": "Qendali POS",
+      "nama": "Qaloka POS",
       "repo": "tsunosora/Pos-Web-Application"
     },
     {
       "kode": "qendali_event",
-      "nama": "Qendali Event",
+      "nama": "Qaloka Event",
       "repo": "tsunosora/Pospro-Event"
     },
     {
       "kode": "qendali_employee",
-      "nama": "Qendali Employee",
+      "nama": "Qaloka Employee",
       "repo": "tsunosora/Rate-My-Staff"
     },
     {
       "kode": "qendali_website",
-      "nama": "Qendali Website",
+      "nama": "Qaloka Website",
       "repo": "tsunosora/dashboard_compro"
     }
   ],
@@ -66,7 +66,7 @@
     },
     {
       "kode": "api.integrations",
-      "nama": "Tersambung ke Qendali Employee",
+      "nama": "Tersambung ke Qaloka Employee",
       "grup": "karyawan"
     },
     {
@@ -236,7 +236,7 @@
     },
     {
       "kode": "hr.pos_link",
-      "nama": "Tersambung ke Qendali POS (staf, KPI, kartu absensi)",
+      "nama": "Tersambung ke Qaloka POS (staf, KPI, kartu absensi)",
       "grup": "hr_absensi"
     },
     {

@@ -48,7 +48,7 @@ export const proyekBaruSchema = proyekDasar.partial().extend({
   aktif: z.boolean().default(true),
 });
 
-// sumber & refId sengaja TIDAK ada di sini: disiapkan untuk proyek tarikan Qendali Event (Tahap 2).
+// sumber & refId sengaja TIDAK ada di sini: disiapkan untuk proyek tarikan Qaloka Event (Tahap 2).
 export const proyekUbahSchema = proyekDasar.partial();
 
 /** Decimal Prisma / null → number / null. */

@@ -14,7 +14,7 @@ export function todayStr(): string {
 const ABSENCE = new Set(["Izin", "Sakit", "Cuti"]);
 
 /**
- * RINGKASAN HR SEKILAS — satu sumber untuk kartu di Qendali POS (/api/integrations/hr-summary)
+ * RINGKASAN HR SEKILAS — satu sumber untuk kartu di Qaloka POS (/api/integrations/hr-summary)
  * dan beranda aplikasi HP Owner (/api/hp/ringkasan). Sengaja ringkas: hanya angka yang bisa
  * dibaca sekilas. Bentuknya kontrak dengan dua repo lain — menambah medan boleh, mengubah jangan.
  */

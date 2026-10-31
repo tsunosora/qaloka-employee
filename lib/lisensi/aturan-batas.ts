@@ -1,7 +1,7 @@
 /**
- * Batas angka dari kunci lisensi Qendali Employee — MURNI (tanpa DB), supaya bisa diuji.
+ * Batas angka dari kunci lisensi Qaloka Employee — MURNI (tanpa DB), supaya bisa diuji.
  *
- * Aturannya sama dengan Qendali POS (backend/src/lisensi/aturan-batas.ts), dan tiga keputusan
+ * Aturannya sama dengan Qaloka POS (backend/src/lisensi/aturan-batas.ts), dan tiga keputusan
  * pemiliknya dipertahankan:
  * 1. Klien yang SUDAH lewat batas DIBIARKAN. Tidak ada karyawan dinonaktifkan, tidak ada mesin
  *    dilepas — yang ditolak cuma PENAMBAHAN baru selama jumlahnya masih di atas batas.
@@ -11,7 +11,7 @@
  *
  * SATU beda dari POS, disengaja: pesannya TIDAK menyebut nama paket. Rute publik (portal, rating
  * tamu) ikut lewat penjaga yang sama, dan nama paket di jawaban galat membuat siapa pun bisa
- * memetakan klien Qendali mana membayar tingkat apa. Kejadian yang sama sudah ditutup di POS &
+ * memetakan klien Qaloka mana membayar tingkat apa. Kejadian yang sama sudah ditutup di POS &
  * Event 7 Okt 2026 untuk 403 fitur.
  */
 
@@ -66,7 +66,7 @@ export interface PutusanBatas {
   pesan: string | null;
 }
 
-const KEMANA = "Naikkan paket lewat portal qendali.com";
+const KEMANA = "Naikkan paket lewat portal qaloka.com";
 
 export function putusanBatas({
   kode,

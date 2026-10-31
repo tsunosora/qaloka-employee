@@ -1,16 +1,16 @@
 /**
- * Sesi aplikasi HP Qendali Owner (repo tsunosora/smartowner).
+ * Sesi aplikasi HP Qaloka Owner (repo tsunosora/smartowner).
  *
- * HP tidak memegang cookie NextAuth. Ia menukar tiket masuk `qm1` dari qendali.com di
+ * HP tidak memegang cookie NextAuth. Ia menukar tiket masuk `qm1` dari qaloka.com di
  * `POST /api/hp/tiket-masuk` menjadi token ini, lalu mengirimnya sebagai
  * `Authorization: Bearer hp1.…` ke API yang SAMA dengan dasbor — `requireSession()` di lib/http.ts
  * menerimanya sebagai pengganti cookie. Jadi tidak ada API kembar untuk HP, dan lisensi, RBAC,
  * serta validasinya otomatis sama.
  *
  * Token = HMAC, bukan JWT pustaka: tiga bagian, amplop `hp1` supaya tidak tertukar dengan tiket
- * qendali.com. Pengguna dibaca ulang dari DB tiap permintaan — dinonaktifkan atau diturunkan
+ * qaloka.com. Pengguna dibaca ulang dari DB tiap permintaan — dinonaktifkan atau diturunkan
  * perannya berlaku seketika — dan token membawa sidik hash sandi, jadi ganti sandi mengusirnya.
- * Habis (401) → HP meminta tiket baru ke qendali.com tanpa bertanya ke pemiliknya.
+ * Habis (401) → HP meminta tiket baru ke qaloka.com tanpa bertanya ke pemiliknya.
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { Session } from "next-auth";

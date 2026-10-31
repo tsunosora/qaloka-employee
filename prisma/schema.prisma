@@ -819,7 +819,7 @@ model TimesheetEntri {
 
 // ── Upah tukang (Tahap 1, 18 Okt 2026) ─────────────────────────────────────────────────────
 // Absensi & upah tukang lapangan dihitung di Employee (keputusan Faisal). Bentuknya meniru link
-// PIC Qendali Event: rekap HARIAN per orang (hadir / setengah / absen) + jam lembur + kota, divisi,
+// PIC Qaloka Event: rekap HARIAN per orang (hadir / setengah / absen) + jam lembur + kota, divisi,
 // proyek/event. Tanggal = DateTime tengah malam LOKAL, sama dengan LeaveRequest & PengajuanLembur.
 // Rekap harian TIDAK menulis ke Attendance (yang itu scan berjam-jam); ia sumber upah tukang.
 
@@ -854,7 +854,7 @@ model TarifKotaDivisi {
 }
 
 // Proyek / event tempat tukang bekerja, dengan tarif khusus opsional. sumber "lokal" = dibuat di
-// Employee; Tahap 2 akan mengisi sumber "event" + refId dari instalasi Qendali Event usaha itu.
+// Employee; Tahap 2 akan mengisi sumber "event" + refId dari instalasi Qaloka Event usaha itu.
 model ProyekKerja {
   id           Int       @id @default(autoincrement())
   kode         String?   @db.VarChar(30)

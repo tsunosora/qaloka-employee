@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Keadaan lisensi Qendali untuk tampilan: menyaring menu, menjaga halaman, dan memasang
+ * Keadaan lisensi Qaloka untuk tampilan: menyaring menu, menjaga halaman, dan memasang
  * spanduk tenggang / hanya-baca. SEMUA INI KOSMETIK — penegakan yang sebenarnya ada di server
  * (lib/http.ts → route()). Keadaannya dihitung di server (layout dasbor) lalu dioper lewat
  * context, jadi tidak ada permintaan tambahan dan menu tidak berkedip.
@@ -58,7 +58,7 @@ export function PenjagaHalaman({ children }: { children: ReactNode }) {
       <h1 className="font-display text-lg font-bold text-fg">Fitur ini belum aktif di langganan ini</h1>
       <p className="mt-2 leading-relaxed text-muted">
         Halaman ini butuh fitur <code className="rounded bg-surface-2 px-1">{kode}</code>, yang tidak termasuk paket
-        Qendali Employee yang terpasang. Datanya tidak diapa-apakan.
+        Qaloka Employee yang terpasang. Datanya tidak diapa-apakan.
       </p>
       <p className="mt-3">
         <Link href="/settings/langganan" className="font-semibold text-primary underline-offset-2 hover:underline">
@@ -75,8 +75,8 @@ export function SpandukLisensi() {
   if (!l.ditegakkan || (l.status !== "tenggang" && !l.hanyaBaca)) return null;
   const sebab =
     l.alasan === "masa_berlaku_habis"
-      ? "Lisensi Qendali sudah habis"
-      : "Kunci lisensi Qendali tidak cocok dengan instalasi ini";
+      ? "Lisensi Qaloka sudah habis"
+      : "Kunci lisensi Qaloka tidak cocok dengan instalasi ini";
   const teks = l.hanyaBaca
     ? `${sebab}: aplikasi HANYA-BACA. Data lama tetap bisa dibuka & diekspor, absensi dari mesin tetap masuk, tapi data baru belum bisa disimpan dari layar.`
     : `Masa berlaku lisensi sudah lewat — masih bisa dipakai ${l.sisaHariTenggang ?? 0} hari lagi sebelum jadi hanya-baca.`;

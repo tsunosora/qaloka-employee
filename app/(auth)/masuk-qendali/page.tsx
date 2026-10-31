@@ -8,14 +8,14 @@ import { IconAlert } from "@/components/ui/icons";
 import { NamaMerek, UbinLogo } from "@/components/QendaliMark";
 
 /**
- * /masuk-qendali?tiket=qm1.… — tujuan tombol "Buka aplikasimu" di portal qendali.com.
+ * /masuk-qendali?tiket=qm1.… — tujuan tombol "Buka aplikasimu" di portal qaloka.com.
  * Jalurnya kontrak dengan repo qendali (lib/tiket-masuk.mjs → JALUR_MASUK).
  *
  * Tiket dipindah ke badan permintaan dan alamat browser dibersihkan SEBELUM diperiksa, supaya
  * tiketnya tidak tertinggal di riwayat, header Referer, atau log akses. Pemeriksaannya di server
  * (provider "qendali-tiket" di lib/auth.ts → lib/lisensi/tiket-masuk.ts).
  */
-export default function MasukQendaliPage() {
+export default function MasukQalokaPage() {
   const router = useRouter();
   const [gagal, setGagal] = useState(false);
   const sudah = useRef(false);
@@ -56,7 +56,7 @@ export default function MasukQendaliPage() {
               style={{ background: "color-mix(in oklab, var(--danger) 16%, transparent)" }}
             >
               <IconAlert className="shrink-0 text-[16px]" />
-              Tautan masuk dari qendali.com tidak bisa dipakai (sudah dipakai, kedaluwarsa, atau akunmu
+              Tautan masuk dari qaloka.com tidak bisa dipakai (sudah dipakai, kedaluwarsa, atau akunmu
               belum terdaftar di sini).
             </div>
             <Link href="/login" className="btn-primary h-11 w-full">

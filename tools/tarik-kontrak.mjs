@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Tarik `kontrak/lisensi.json` dari repo qendali (sumbernya) ke repo ini.
- * Disalin dari Qendali POS (tools/tarik-kontrak.mjs) 11 Okt 2026 — produk di sini qendali_employee.
+ * Disalin dari Qaloka POS (tools/tarik-kontrak.mjs) 11 Okt 2026 — produk di sini qendali_employee.
  *
  *   node tools/tarik-kontrak.mjs                 → salin, lalu laporkan apa yang berubah
  *   node tools/tarik-kontrak.mjs --periksa       → jangan salin; kode 1 kalau beda
@@ -24,10 +24,10 @@ import { fileURLToPath } from 'node:url';
 const AKAR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TUJUAN = join(AKAR, 'kontrak', 'lisensi.json');
 
-const repoQendali = process.env.QENDALI_REPO
+const repoQaloka = process.env.QENDALI_REPO
     ? resolve(process.env.QENDALI_REPO)
     : resolve(AKAR, '..', 'qendali');
-const SUMBER = join(repoQendali, 'kontrak', 'lisensi.json');
+const SUMBER = join(repoQaloka, 'kontrak', 'lisensi.json');
 
 const periksaSaja = process.argv.includes('--periksa');
 

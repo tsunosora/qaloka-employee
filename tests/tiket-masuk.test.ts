@@ -82,7 +82,7 @@ describe("token sesi HP", () => {
     expect(tokenDariHeader("Bearer hp1.a.b")).toBe("hp1.a.b");
     expect(tokenDariHeader("bearer   hp1.a.b")).toBe("hp1.a.b");
     expect(tokenDariHeader("Bearer eyJ.a.b")).toBeNull();
-    expect(tokenDariHeader("Qendali qi1.a.b")).toBeNull();
+    expect(tokenDariHeader("Qaloka qi1.a.b")).toBeNull();
     expect(tokenDariHeader(null)).toBeNull();
   });
 });

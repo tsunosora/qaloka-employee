@@ -1,16 +1,16 @@
 /**
- * Verifikasi kunci lisensi Qendali — SALINAN LOGIKA dari penerbitnya, bukan tebakan.
+ * Verifikasi kunci lisensi Qaloka — SALINAN LOGIKA dari penerbitnya, bukan tebakan.
  *
- * Disalin 11 Okt 2026 dari Qendali POS (backend/src/lisensi/periksa-kunci.ts). Kata "kasir" di
+ * Disalin 11 Okt 2026 dari Qaloka POS (backend/src/lisensi/periksa-kunci.ts). Kata "kasir" di
  * komentar bawah ini berlaku sama untuk aplikasi HR: absensi tidak boleh berhenti karena lisensi.
  *
- * Acuan: `qendali/lib/lisensi.mjs` + `qendali/docs/lisensi.md` (repo website qendali.com).
+ * Acuan: `qendali/lib/lisensi.mjs` + `qendali/docs/lisensi.md` (repo website qaloka.com).
  * Kalau acuan itu berubah, berkas ini yang harus ikut diubah — nama fungsi, nama alasan
  * penolakan, dan bentuk hasilnya sengaja dibuat sama supaya dua sisi bisa dibandingkan
  * baris demi baris.
  *
  * Tiga hal yang perlu diingat:
- * 1. Verifikasinya LOKAL, tanpa jaringan. Kita cuma pegang kunci publik; qendali.com yang
+ * 1. Verifikasinya LOKAL, tanpa jaringan. Kita cuma pegang kunci publik; qaloka.com yang
  *    pegang kunci privat. Jadi kasir tetap jalan walau internet atau server induk mati.
  * 2. Tanpa dependensi baru — Ed25519 sudah ada di `node:crypto` bawaan Node.
  * 3. Berkas ini MURNI (tanpa Nest, tanpa fs, tanpa env) supaya bisa diuji tanpa DB & jaringan.
@@ -109,7 +109,7 @@ export interface MasaBerlaku {
     /** 'aktif' | 'tenggang' | 'kedaluwarsa' — sama dengan penerbit. */
     status: 'aktif' | 'tenggang' | 'kedaluwarsa';
     /**
-     * Ikut acuan (qendali.com lib/lisensi.mjs): `hanyaBaca` baru menyala saat KEDALUWARSA —
+     * Ikut acuan (qaloka.com lib/lisensi.mjs): `hanyaBaca` baru menyala saat KEDALUWARSA —
      * selama masa tenggang masih boleh menulis. (Salinan di POS masih `!== 'aktif'`, basi.) Yang dipakai guard aplikasi BUKAN field ini,
      * melainkan `Keadaan.hanyaBaca` di `keadaan-lisensi.ts`, yang baru menyala setelah
      * tenggang habis. Alasannya ada di berkas itu.

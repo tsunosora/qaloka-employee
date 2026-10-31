@@ -1,8 +1,8 @@
 /**
- * Tiket masuk `qm1` dari qendali.com — pemilik masuk tanpa mengetik sandi kedua kalinya.
+ * Tiket masuk `qm1` dari qaloka.com — pemilik masuk tanpa mengetik sandi kedua kalinya.
  * Dua pintu memakai pemeriksa yang SAMA:
  *   - `/masuk-qendali` (peramban, tombol "Buka aplikasimu" di portal) → sesi NextAuth.
- *   - `POST /api/hp/tiket-masuk` (aplikasi HP Qendali Owner)          → token HP (lib/hp/sesi.ts).
+ *   - `POST /api/hp/tiket-masuk` (aplikasi HP Qaloka Owner)          → token HP (lib/hp/sesi.ts).
  *
  * Aturannya di repo qendali, docs/lisensi.md → "Tiket masuk". GAGAL-TERTUTUP: salah di sini berarti
  * orang asing membaca data karyawan usaha lain, jadi ragu sedikit pun → tolak. Isi tiket tidak
@@ -149,8 +149,8 @@ export async function pakaiTiketMasuk(
 /** Pesan untuk manusia. Alasan teknisnya tetap di log server, bukan di layar. */
 export function pesanTiketDitolak(alasan: string): string {
   if (alasan === "pengguna_tidak_ada")
-    return "Email akun qendali.com ini belum terdaftar sebagai pengguna aktif di Qendali Employee. Minta admin menambahkannya di Pengguna.";
+    return "Email akun qaloka.com ini belum terdaftar sebagai pengguna aktif di Qaloka Employee. Minta admin menambahkannya di Pengguna.";
   if (alasan === "tiket_sudah_dipakai" || alasan === "kedaluwarsa")
     return "Tautan masuk sudah dipakai atau kedaluwarsa. Coba lagi.";
-  return "Tidak bisa masuk dengan akun qendali.com. Masuk dengan email dan sandi Qendali Employee.";
+  return "Tidak bisa masuk dengan akun qaloka.com. Masuk dengan email dan sandi Qaloka Employee.";
 }

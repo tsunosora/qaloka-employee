@@ -37,7 +37,7 @@ export const POST = route(async (req: Request) => {
       upahHarian: d.upahHarian ?? null,
       lemburPerJam: d.lemburPerJam ?? null,
       aktif: d.aktif,
-      // sumber "lokal" (bawaan skema); proyek dari Qendali Event menyusul di Tahap 2.
+      // sumber "lokal" (bawaan skema); proyek dari Qaloka Event menyusul di Tahap 2.
     },
     include: { _count: { select: { rekap: true } } },
   });

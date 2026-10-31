@@ -7,7 +7,7 @@ import { KelolaTim } from "./KelolaTim";
 
 /**
  * Layar "Absen tim" untuk PIC lapangan (bagian halaman /absen/[token]) — REKAP HARIAN, bentuknya
- * meniru link PIC di Qendali Event: satu kartu per anggota tim, Hadir / ½ Hari / Absen, jam lembur,
+ * meniru link PIC di Qaloka Event: satu kartu per anggota tim, Hadir / ½ Hari / Absen, jam lembur,
  * kota, divisi, proyek, foto opsional, lalu satu tombol Simpan untuk semuanya. Semua yang disimpan
  * MENUNGGU persetujuan owner/HR (Absensi → Rekap tim); hanya yang disetujui dihitung upah.
  * Menggantikan alur lama "buka sesi + absen masuk/pulang satu per satu".

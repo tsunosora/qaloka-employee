@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Pengaturan → Langganan: keadaan kunci lisensi Qendali instalasi ini. Hanya-baca, kecuali satu
- * tombol "Segarkan" — dipakai sesudah membayar atau ganti paket di qendali.com, supaya tidak
+ * Pengaturan → Langganan: keadaan kunci lisensi Qaloka instalasi ini. Hanya-baca, kecuali satu
+ * tombol "Segarkan" — dipakai sesudah membayar atau ganti paket di qaloka.com, supaya tidak
  * perlu menunggu penyegaran berkala. Halaman ini SENGAJA tidak pernah diblokir lisensi: ia jalan
  * keluarnya.
  */
@@ -84,7 +84,7 @@ export default function LanggananPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold text-fg">Langganan</h1>
-          <p className="mt-0.5 text-sm text-muted">Paket Qendali Employee yang terpasang di aplikasi ini.</p>
+          <p className="mt-0.5 text-sm text-muted">Paket Qaloka Employee yang terpasang di aplikasi ini.</p>
         </div>
         {r?.tokenTerpasang && (
           <button onClick={segarkan} disabled={sedang} className="btn-primary h-10">
@@ -122,8 +122,8 @@ export default function LanggananPage() {
           {!r.ditegakkan && (
             <div className="glass rounded-2xl p-5 text-sm leading-relaxed text-muted">
               {r.tokenTerpasang
-                ? "Token instalasi sudah terpasang, tapi kunci lisensi belum pernah berhasil diambil dari qendali.com. Sampai kuncinya ada, semua fitur tetap terbuka."
-                : "Aplikasi ini belum tersambung ke langganan Qendali, jadi semua fitur terbuka. Penyambungan dilakukan oleh tim Qendali saat pemasangan."}
+                ? "Token instalasi sudah terpasang, tapi kunci lisensi belum pernah berhasil diambil dari qaloka.com. Sampai kuncinya ada, semua fitur tetap terbuka."
+                : "Aplikasi ini belum tersambung ke langganan Qaloka, jadi semua fitur terbuka. Penyambungan dilakukan oleh tim Qaloka saat pemasangan."}
               {r.catatanPenyegaran && (
                 <div className="mt-2 font-mono text-xs text-subtle">Catatan terakhir: {r.catatanPenyegaran}</div>
               )}
@@ -145,7 +145,7 @@ export default function LanggananPage() {
                     <tr key={kode} className="border-t border-border">
                       <td className="px-4 py-3 text-fg">{namaBatas.get(kode) ?? kode}</td>
                       <td className="px-4 py-3 tabular-nums">
-                        {kode in r.pemakaian ? r.pemakaian[kode] : <span className="text-xs text-subtle">dihitung di qendali.com</span>}
+                        {kode in r.pemakaian ? r.pemakaian[kode] : <span className="text-xs text-subtle">dihitung di qaloka.com</span>}
                       </td>
                       <td className="px-4 py-3 tabular-nums">{nilai === null ? "tanpa batas" : nilai}</td>
                     </tr>
@@ -170,7 +170,7 @@ export default function LanggananPage() {
               })}
             </ul>
             <p className="mt-4 text-xs text-subtle">
-              Ganti paket lewat portal qendali.com, lalu tekan “Segarkan lisensi” di atas.
+              Ganti paket lewat portal qaloka.com, lalu tekan “Segarkan lisensi” di atas.
             </p>
           </div>
         </>

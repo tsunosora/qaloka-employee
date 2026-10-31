@@ -1,17 +1,17 @@
 /**
- * Layanan lisensi Qendali di sisi server: membaca kunci tersimpan, menyimpulkan keadaannya, dan
- * menyegarkannya dari qendali.com. Diturunkan dari `lisensi.service.ts` aplikasi POS (Nest),
+ * Layanan lisensi Qaloka di sisi server: membaca kunci tersimpan, menyimpulkan keadaannya, dan
+ * menyegarkannya dari qaloka.com. Diturunkan dari `lisensi.service.ts` aplikasi POS (Nest),
  * ditulis ulang tanpa Nest.
  *
  * Aturan yang dibawa apa adanya:
  * - GAGAL-TERBUKA. Tanpa token / tanpa kunci = tidak ada yang ditegakkan.
  * - Penyegaran TIDAK PERNAH melempar. Gagal = kunci lama dipertahankan + catatan di berkas.
  * - Kunci baru diverifikasi tanda tangannya SEBELUM menimpa yang lama.
- * - Token instalasi tidak pernah keluar ke peramban; cuma server ini yang memanggil qendali.com.
+ * - Token instalasi tidak pernah keluar ke peramban; cuma server ini yang memanggil qaloka.com.
  *
  * Keadaan disimpan di `globalThis`, bukan variabel modul: `next dev` memuat ulang modul tiap
  * berkas disentuh, dan pengatur waktu yang ikut dibuat ulang akan menumpuk (pelajaran kolam
- * koneksi MySQL di qendali.com).
+ * koneksi MySQL di qaloka.com).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -73,7 +73,7 @@ export async function keadaanLisensi(): Promise<Keadaan & { simpanan: Simpanan }
   return { ...keadaan, simpanan };
 }
 
-/** Minta kunci baru ke qendali.com. Panggilan berbarengan digabung jadi satu. */
+/** Minta kunci baru ke qaloka.com. Panggilan berbarengan digabung jadi satu. */
 export function segarkanLisensi(alasan = "manual"): Promise<void> {
   if (!wadah.sedang) {
     wadah.sedang = jalankanPenyegaran(alasan).finally(() => {

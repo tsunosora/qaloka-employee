@@ -59,11 +59,11 @@ const TIMEOUT_MS = 6000;
 
 /**
  * Tersambung ke POS kalau alamatnya ada DAN ada cara membuktikan diri: kunci API lama, atau
- * token lisensi Qendali (untuk meminta tiket integrasi ke qendali.com).
+ * token lisensi Qaloka (untuk meminta tiket integrasi ke qaloka.com).
  */
 export function posproConfigured(): boolean {
-  const tokenQendali = Boolean((process.env.QENDALI_LISENSI_TOKEN || "").trim());
-  return Boolean(process.env.POSPRO_API_URL && (process.env.POSPRO_API_KEY || tokenQendali));
+  const tokenQaloka = Boolean((process.env.QENDALI_LISENSI_TOKEN || "").trim());
+  return Boolean(process.env.POSPRO_API_URL && (process.env.POSPRO_API_KEY || tokenQaloka));
 }
 
 async function call<T>(path: string, body?: unknown): Promise<T | null> {

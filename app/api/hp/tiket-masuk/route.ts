@@ -13,8 +13,8 @@ function ipPemanggil(req: Request): string {
 }
 
 /**
- * POST /api/hp/tiket-masuk { tiket } — aplikasi HP Qendali Owner menukar tiket masuk `qm1`
- * (dari qendali.com `/api/hp/tiket`) menjadi token sesi HP. Lihat lib/hp/sesi.ts.
+ * POST /api/hp/tiket-masuk { tiket } — aplikasi HP Qaloka Owner menukar tiket masuk `qm1`
+ * (dari qaloka.com `/api/hp/tiket`) menjadi token sesi HP. Lihat lib/hp/sesi.ts.
  *
  * Jawaban: { token, kedaluwarsaPada, pengguna, usaha, fitur }. `fitur` = fitur lisensi aktif
  * (null = instalasi tanpa penegakan lisensi, semua terbuka) supaya HP tidak menampilkan layar
@@ -40,7 +40,7 @@ export const POST = route(async (req: Request) => {
   if (!canManage(hasil.pengguna.role)) {
     return NextResponse.json(
       {
-        message: "Akun ini bukan Owner/Admin/HR di Qendali Employee, jadi tidak bisa dibuka dari aplikasi Owner.",
+        message: "Akun ini bukan Owner/Admin/HR di Qaloka Employee, jadi tidak bisa dibuka dari aplikasi Owner.",
         alasan: "peran_tidak_cukup",
       },
       { status: 403 },
@@ -52,7 +52,7 @@ export const POST = route(async (req: Request) => {
   if (!sesi) {
     console.error("[hp/tiket-masuk] HP_SESI_RAHASIA / AUTH_SECRET belum diisi — token HP tidak bisa diterbitkan");
     return NextResponse.json(
-      { message: "Server Qendali Employee belum siap untuk aplikasi HP. Hubungi Qendali.", alasan: "belum_siap" },
+      { message: "Server Qaloka Employee belum siap untuk aplikasi HP. Hubungi Qaloka.", alasan: "belum_siap" },
       { status: 503 },
     );
   }

@@ -19,12 +19,12 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Guard mesin-ke-mesin untuk endpoint `/api/integrations/*` (backend Qendali POS menampilkan
+ * Guard mesin-ke-mesin untuk endpoint `/api/integrations/*` (backend Qaloka POS menampilkan
  * kartu ringkas HR).
  *
  * DUA PINTU (11 Okt 2026):
- * A. `Authorization: Qendali <tiket>` — tiket integrasi bertanda tangan dari qendali.com. Boleh
- *    dari mesin MANA PUN, karena tiketnya membuktikan pemanggilnya produk Qendali milik usaha yang
+ * A. `Authorization: Qendali <tiket>` — tiket integrasi bertanda tangan dari qaloka.com. Boleh
+ *    dari mesin MANA PUN, karena tiketnya membuktikan pemanggilnya produk Qaloka milik usaha yang
  *    SAMA dengan kunci lisensi aplikasi ini. Kalau header ini ada, HANYA tiket yang dinilai —
  *    tiket yang ditolak tidak jatuh ke kunci API (supaya kegagalannya terlihat, bukan tertutup).
  * B. Kunci API lama (di bawah) — masa peralihan, untuk instalasi yang belum berlisensi.
