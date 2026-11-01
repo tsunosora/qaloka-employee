@@ -26,14 +26,15 @@ const TUJUAN = join(AKAR, 'kontrak', 'lisensi.json');
 
 const repoQaloka = process.env.QENDALI_REPO
     ? resolve(process.env.QENDALI_REPO)
-    : resolve(AKAR, '..', 'qendali');
+    // Folder situs bernama qaloka sejak 1 Nov 2026; folder lama qendali tetap dikenali.
+    : [resolve(AKAR, '..', 'qaloka'), resolve(AKAR, '..', 'qendali')].find((d) => existsSync(join(d, 'kontrak', 'lisensi.json'))) ?? resolve(AKAR, '..', 'qaloka');
 const SUMBER = join(repoQaloka, 'kontrak', 'lisensi.json');
 
 const periksaSaja = process.argv.includes('--periksa');
 
 if (!existsSync(SUMBER)) {
     console.error(`Tidak ketemu: ${SUMBER}`);
-    console.error('Setel QENDALI_REPO ke folder repo qendali, dan pastikan `npm run kontrak` sudah dijalankan di sana.');
+    console.error('Setel QENDALI_REPO ke folder repo situs Qaloka, dan pastikan `npm run kontrak` sudah dijalankan di sana.');
     process.exit(2);
 }
 
