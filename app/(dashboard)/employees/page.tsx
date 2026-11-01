@@ -488,7 +488,7 @@ export default function EmployeesPage() {
                 {posproStaff === null
                   ? "Memuat daftar akun PosPro…"
                   : posproStaff.length === 0
-                    ? "PosPro tak bisa dihubungi atau integrasi belum diaktifkan (POSPRO_API_URL/POSPRO_API_KEY)."
+                    ? "POS tak bisa dihubungi atau integrasi belum diaktifkan (POSPRO_API_URL dan lisensi Qaloka, usaha harus berlangganan Qaloka POS)."
                     : "Menarik rating pelanggan, tugas/piket, dan penjualan dari PosPro ke halaman karyawan."}
               </span>
             </Field>

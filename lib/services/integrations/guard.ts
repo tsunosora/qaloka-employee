@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { periksaTiketIntegrasi, tiketDariHeader } from "@/lib/lisensi/tiket-integrasi";
+import { kunciLamaDiizinkan } from "@/lib/lisensi/kunci-lama";
 
 /** Header yang HANYA dipasang Cloudflare — keberadaannya saja sudah berarti dari luar. */
 const CLOUDFLARE_HEADERS = ["cf-connecting-ip", "cf-ray", "cf-ipcountry"];
@@ -27,7 +28,8 @@ function safeEqual(a: string, b: string): boolean {
  *    dari mesin MANA PUN, karena tiketnya membuktikan pemanggilnya produk Qaloka milik usaha yang
  *    SAMA dengan kunci lisensi aplikasi ini. Kalau header ini ada, HANYA tiket yang dinilai —
  *    tiket yang ditolak tidak jatuh ke kunci API (supaya kegagalannya terlihat, bukan tertutup).
- * B. Kunci API lama (di bawah) — masa peralihan, untuk instalasi yang belum berlisensi.
+ * B. Kunci API lama (di bawah) — MATI secara bawaan sejak peralihan selesai; cuma hidup kalau
+ *    jalan mundur `QENDALI_INTEGRASI_KUNCI_LAMA=true` dinyalakan.
  *
  * Pintu B, aslinya:
  *
@@ -46,6 +48,15 @@ export async function requireIntegrationKey(req: Request): Promise<void> {
     const h = await periksaTiketIntegrasi(tiket);
     if (h.sah) return;
     throw NextResponse.json({ message: "Tiket integrasi ditolak.", alasan: h.alasan }, { status: 401 });
+  }
+
+  // Pintu B MATI secara bawaan — kunci yang tertinggal di .env tidak membuka apa pun.
+  // Lihat lib/lisensi/kunci-lama.ts.
+  if (!kunciLamaDiizinkan()) {
+    throw NextResponse.json(
+      { message: "Endpoint integrasi cuma menerima tiket integrasi Qaloka." },
+      { status: 401 }
+    );
   }
 
   const expected = process.env.HR_API_KEY;

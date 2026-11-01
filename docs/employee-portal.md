@@ -283,11 +283,12 @@ seandainya kunci API bocor.
 
 | Sisi | Variabel | Isi |
 |---|---|---|
-| PosPro | `STAFF_KPI_API_KEY` | kunci acak; **kosong = integrasi mati** (semua request ditolak) |
+| Kedua sisi | `QENDALI_LISENSI_TOKEN` | token instalasi dari qendali.com — dipakai meminta tiket integrasi `qi1` |
 | RateMyStaff | `POSPRO_API_URL` | `http://127.0.0.1:3001` |
-| RateMyStaff | `POSPRO_API_KEY` | harus sama persis dengan `STAFF_KPI_API_KEY` |
 
-Buat kunci baru: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+**Sejak 17 Okt 2026 tidak ada kunci bersama.** `STAFF_KPI_API_KEY` (POS) dan `POSPRO_API_KEY`
+(di sini) diabaikan kecuali jalan mundur `QENDALI_INTEGRASI_KUNCI_LAMA=true` dinyalakan di kedua
+aplikasi.
 
 ### Pemetaan karyawan ↔ akun PosPro
 

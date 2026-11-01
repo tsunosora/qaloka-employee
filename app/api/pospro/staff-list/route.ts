@@ -3,7 +3,7 @@ import { fetchPosproStaffList, posproConfigured } from "@/lib/services/pospro/cl
 
 /**
  * Daftar akun PosPro untuk memetakan karyawan (Direktori → Edit → Akun PosPro).
- * `configured: false` = POSPRO_API_URL/POSPRO_API_KEY belum diisi di .env;
+ * `configured: false` = POSPRO_API_URL/QENDALI_LISENSI_TOKEN belum diisi di .env;
  * `reachable: false` = konfigurasi ada tapi PosPro tak bisa dihubungi saat ini.
  */
 export const GET = route(async () => {

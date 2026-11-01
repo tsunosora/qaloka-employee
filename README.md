@@ -154,10 +154,11 @@ Detail lengkap: **[docs/employee-portal.md](docs/employee-portal.md)**.
 
 Bila diaktifkan, halaman karyawan ikut menampilkan **kinerja operasional** dari PosPro:
 rating pelanggan, ketuntasan tugas/piket, dan penjualan. Datanya diambil dari endpoint
-`/integrations/staff-kpi` di PosPro memakai header `x-api-key`.
+`/integrations/staff-kpi` di PosPro memakai tiket integrasi `qi1` dari qendali.com.
 
-Aktifkan dengan mengisi `POSPRO_API_URL` & `POSPRO_API_KEY` di `.env` (kuncinya harus sama
-dengan `STAFF_KPI_API_KEY` di PosPro), lalu petakan tiap karyawan ke akun PosPro-nya di
+Aktifkan dengan mengisi `POSPRO_API_URL` dan `QENDALI_LISENSI_TOKEN` di `.env` (usahanya harus
+berlangganan Qendali POS juga; tidak ada kunci bersama — `POSPRO_API_KEY` lama diabaikan kecuali
+jalan mundur `QENDALI_INTEGRASI_KUNCI_LAMA=true`), lalu petakan tiap karyawan ke akun PosPro-nya di
 **Direktori → Edit → Akun PosPro**. Tanpa konfigurasi itu integrasi mati dan halaman
 karyawan tetap jalan seperti biasa.
 

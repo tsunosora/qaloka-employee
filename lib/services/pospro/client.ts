@@ -2,11 +2,12 @@
  * Klien integrasi PosPro (kasir) — dipakai untuk menarik KPI kinerja karyawan.
  *
  * Endpoint di sisi PosPro: `/integrations/staff-list` & `/integrations/staff-kpi`,
- * dijaga header `x-api-key` (lihat backend/src/auth/api-key.guard.ts di repo PosPro).
- * Integrasi MATI bila POSPRO_API_URL / POSPRO_API_KEY belum diisi — semua fungsi
+ * dijaga tiket integrasi `qi1` dari qendali.com (lihat backend/src/auth/api-key.guard.ts di repo
+ * POS). Integrasi MATI bila POSPRO_API_URL / QENDALI_LISENSI_TOKEN belum diisi — semua fungsi
  * mengembalikan null, dan pemanggil harus tetap jalan tanpa data ini.
  */
 import { tiketUntuk } from "@/lib/lisensi/tiket-integrasi";
+import { kunciLamaDiizinkan } from "@/lib/lisensi/kunci-lama";
 
 export type PosproStaff = {
   userId: number;
@@ -57,27 +58,37 @@ export type PosproKpiResponse = {
 /** Batas tunggu panggilan ke PosPro — jangan sampai portal karyawan ikut menggantung. */
 const TIMEOUT_MS = 6000;
 
+/** Kunci API lama — cuma dipakai kalau jalan mundur QENDALI_INTEGRASI_KUNCI_LAMA=true menyala. */
+function kunciLama(): string | undefined {
+  return kunciLamaDiizinkan() ? process.env.POSPRO_API_KEY || undefined : undefined;
+}
+
 /**
- * Tersambung ke POS kalau alamatnya ada DAN ada cara membuktikan diri: kunci API lama, atau
- * token lisensi Qaloka (untuk meminta tiket integrasi ke qaloka.com).
+ * Tersambung ke POS kalau alamatnya ada DAN ada cara membuktikan diri: token lisensi Qaloka
+ * (untuk meminta tiket integrasi ke qaloka.com), atau kunci lama selama jalan mundur menyala.
  */
 export function posproConfigured(): boolean {
   const tokenQaloka = Boolean((process.env.QENDALI_LISENSI_TOKEN || "").trim());
-  return Boolean(process.env.POSPRO_API_URL && (process.env.POSPRO_API_KEY || tokenQaloka));
+  return Boolean(process.env.POSPRO_API_URL && (tokenQaloka || kunciLama()));
 }
 
 async function call<T>(path: string, body?: unknown): Promise<T | null> {
   if (!posproConfigured()) return null;
   const base = process.env.POSPRO_API_URL!.replace(/\/+$/, "");
-  // Tiket integrasi dulu, kunci API lama sebagai cadangan. Selama peralihan DUA-DUANYA dikirim:
-  // POS lama cuma membaca x-api-key, POS baru menilai tiketnya.
+  // Tiket integrasi. Kunci API lama TIDAK pernah keluar dari server ini kecuali jalan mundur
+  // QENDALI_INTEGRASI_KUNCI_LAMA=true menyala (lihat lib/lisensi/kunci-lama.ts).
   const tiket = await tiketUntuk("qendali");
+  const kunci = kunciLama();
+  if (!tiket && !kunci) {
+    console.error(`[pospro] ${path} dilewati: tiket integrasi tidak tersedia`);
+    return null;
+  }
 
   try {
     const res = await fetch(`${base}${path}`, {
       method: body === undefined ? "GET" : "POST",
       headers: {
-        ...(process.env.POSPRO_API_KEY ? { "x-api-key": process.env.POSPRO_API_KEY } : {}),
+        ...(kunci ? { "x-api-key": kunci } : {}),
         ...(tiket ? { authorization: `Qendali ${tiket}` } : {}),
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       },

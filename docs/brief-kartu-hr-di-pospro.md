@@ -1,5 +1,9 @@
 # Brief — Kartu Sekilas HR di PosPro
 
+> **Catatan sejarah.** Kunci bersama `HR_API_KEY` di brief ini sudah DIGANTI tiket integrasi `qi1`
+> (11 Okt 2026) dan pintunya dimatikan secara bawaan sejak 17 Okt 2026 — lihat
+> `lib/lisensi/kunci-lama.ts`. Bagian kunci di bawah tidak berlaku lagi.
+
 Untuk dikerjakan di repo **PosPro**. Sisi RateMyStaff (endpoint + kunci) sudah siap dan
 berjalan; brief ini hanya mendeskripsikan apa yang perlu dibangun di PosPro.
 
