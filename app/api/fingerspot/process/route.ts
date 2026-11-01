@@ -6,7 +6,13 @@ import { mapScanlogs, type RawScan } from "@/lib/services/fingerspot/mapper";
  * menjadi record Attendance. Best-effort: mengambil scan dari kolom pin/scanAt
  * atau dari array `scans`/`data` di rawBody bila ada.
  */
-export async function POST() {
+export async function POST(req: Request) {
+  // sec-gate: endpoint internal, tak ada pemanggil publik yang sah — wajib CRON_SECRET (fail-closed).
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return Response.json({ ok: false, message: "CRON_SECRET belum diset." }, { status: 503 });
+  const provided = req.headers.get("x-cron-secret") ?? new URL(req.url).searchParams.get("secret");
+  if (provided !== secret) return Response.json({ ok: false, message: "unauthorized" }, { status: 401 });
+
   const logs = await prisma.fingerspotRawLog.findMany({
     where: { processed: false },
     orderBy: { createdAt: "asc" },

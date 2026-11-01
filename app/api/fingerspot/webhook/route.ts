@@ -6,11 +6,11 @@ import { prisma } from "@/lib/prisma";
 export async function POST(req: Request) {
   // Opsional: verifikasi secret bila di-set.
   const secret = process.env.FINGERSPOT_WEBHOOK_SECRET;
-  if (secret) {
-    const provided = req.headers.get("x-webhook-secret") ?? new URL(req.url).searchParams.get("secret");
-    if (provided !== secret) {
-      return Response.json({ ok: false, message: "unauthorized" }, { status: 401 });
-    }
+  // sec-gate: wajib secret (fail-closed) — tak ada pemanggil publik yang sah.
+  if (!secret) return Response.json({ ok: false, message: "FINGERSPOT_WEBHOOK_SECRET belum diset." }, { status: 503 });
+  const provided = req.headers.get("x-webhook-secret") ?? new URL(req.url).searchParams.get("secret");
+  if (provided !== secret) {
+    return Response.json({ ok: false, message: "unauthorized" }, { status: 401 });
   }
 
   const text = await req.text();
