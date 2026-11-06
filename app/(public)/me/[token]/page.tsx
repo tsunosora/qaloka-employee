@@ -20,12 +20,15 @@ import { LemburPanel } from "@/components/portal/LemburPanel";
 import { ReimbursementPanel } from "@/components/portal/ReimbursementPanel";
 import { KunjunganPanel } from "@/components/portal/KunjunganPanel";
 import { TimesheetPanel } from "@/components/portal/TimesheetPanel";
+import { MagangPanel } from "@/components/portal/MagangPanel";
 import { soft } from "@/components/portal/ui";
 import type { Overview, PortalState } from "@/components/portal/types";
 
 // `fitur` = kode lisensi yang harus ada supaya tab tampil (lib/services/portal/keadaan.ts).
 // `bulanan` = tab memakai pemilih bulan di atas; yang tidak punya rentangnya sendiri.
-const TABS: readonly { key: string; label: string; fitur?: string; bulanan?: boolean }[] = [
+// `magang` = hanya tampil untuk peserta magang aktif (state.magang).
+const TABS: readonly { key: string; label: string; fitur?: string; bulanan?: boolean; magang?: boolean }[] = [
+  { key: "magang", label: "Magang", fitur: "hr.assessment", magang: true },
   { key: "overview", label: "Ringkasan", bulanan: true },
   { key: "attendance", label: "Absensi", bulanan: true },
   { key: "assessment", label: "Penilaian", bulanan: true },
@@ -74,7 +77,10 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
 
   const loadState = useCallback(async () => {
     try {
-      setState(await api<PortalState>(`/api/public/portal/${token}?v=1${ownerQuery}`));
+      const s = await api<PortalState>(`/api/public/portal/${token}?v=1${ownerQuery}`);
+      setState(s);
+      // Anak magang membuka halaman ini terutama untuk pos & tugas mingguannya.
+      if (s.magang && s.fitur?.["hr.assessment"] !== false) setTab((t) => (t === "overview" ? "magang" : t));
     } catch {
       setInvalid(true);
     }
@@ -199,7 +205,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
         <div className="flex flex-wrap items-center gap-2">
           {/* Tab di barisnya sendiri: kalau berbagi baris dengan pemilih bulan, di HP cuma satu tab yang terlihat. */}
           <nav ref={deretTab} className="glass flex w-full gap-1 overflow-x-auto rounded-2xl p-1">
-            {TABS.filter((t) => !t.fitur || state.fitur?.[t.fitur] !== false).map((t) => (
+            {TABS.filter((t) => (!t.fitur || state.fitur?.[t.fitur] !== false) && (!t.magang || state.magang)).map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
@@ -244,7 +250,9 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
           )}
         </div>
 
-        {tab === "leave" ? (
+        {tab === "magang" && state.magang ? (
+          <MagangPanel token={token} ownerQuery={ownerQuery} />
+        ) : tab === "leave" ? (
           <LeavePanel token={token} ownerQuery={ownerQuery} />
         ) : tab === "lembur" ? (
           <LemburPanel token={token} ownerQuery={ownerQuery} />

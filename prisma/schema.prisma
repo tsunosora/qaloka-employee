@@ -69,6 +69,7 @@ model User {
   absenHpDecisions    AbsenHpBukti[]    @relation("AbsenHpDecider")
   absenTimDecisions   AbsenTimBaris[]   @relation("AbsenTimDecider")
   rekapDecisions      RekapHarian[]     @relation("RekapDecider")
+  magangDinilai       MagangTugas[]     @relation("MagangPenilai")
 }
 
 model Department {
@@ -190,6 +191,8 @@ model Employee {
   rekapDicatat         RekapHarian[]          @relation("RekapPic")
   penyesuaianUpah      PenyesuaianUpah[]      @relation("PenyesuaianKaryawan")
   pembayaranUpah       PembayaranUpah[]       @relation("PembayaranKaryawan")
+  magangPeserta        MagangPeserta?
+  magangDibimbing      MagangPos[]            @relation("MagangPembimbing")
 
   @@index([isActive])
 }
@@ -982,4 +985,117 @@ model FingerspotPerintah {
 
   @@index([machineId, status])
   @@index([createdAt])
+}
+
+// ── Program magang / PKL (6 Nov 2026) ─────────────────────────────────────────────────────────
+// Anak magang = Employee biasa (supaya punya portal /me + PIN), ditandai lewat MagangPeserta.
+// Mereka dirotasi antar pos kerja (MagangPenugasan, disusun lib/services/magang/rotasi.ts) dan
+// tiap akhir minggu mengisi tugas mengingat + kuis (MagangTugas) yang lalu dinilai pembimbing.
+
+// Pos kerja yang dirotasi (mis. Operator Cetak). durasiMinggu: 2 = pos berat, 1 = pos ringan.
+model MagangPos {
+  id           Int       @id @default(autoincrement())
+  nama         String    @db.VarChar(80)
+  // Yang harus dikuasai di pos ini — tampil di HP anak sebagai target minggu ini.
+  deskripsi    String?   @db.Text
+  durasiMinggu Int       @default(1)
+  kapasitas    Int       @default(1)
+  urutan       Int       @default(0)
+  pembimbingId Int?
+  aktif        Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  pembimbing Employee?         @relation("MagangPembimbing", fields: [pembimbingId], references: [id], onDelete: SetNull)
+  soal       MagangSoal[]
+  penugasan  MagangPenugasan[]
+  tugas      MagangTugas[]
+
+  @@index([pembimbingId])
+}
+
+// Bank soal kuis pilihan ganda per pos. pilihan = string[]; benar = indeks pilihan yang benar.
+model MagangSoal {
+  id         Int      @id @default(autoincrement())
+  posId      Int
+  pertanyaan String   @db.Text
+  pilihan    Json
+  benar      Int
+  aktif      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  pos MagangPos @relation(fields: [posId], references: [id], onDelete: Cascade)
+
+  @@index([posId])
+}
+
+model MagangPeserta {
+  id         Int       @id @default(autoincrement())
+  employeeId Int       @unique
+  sekolah    String?   @db.VarChar(150)
+  jurusan    String?   @db.VarChar(100)
+  mulai      DateTime
+  selesai    DateTime?
+  aktif      Boolean   @default(true)
+  catatan    String?   @db.Text
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  employee  Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  penugasan MagangPenugasan[]
+  tugas     MagangTugas[]
+}
+
+// Satu blok rotasi: anak memegang pos `posId` selama `minggu` minggu mulai Senin `mulai`.
+// berbagi = pos itu sedang dipegang anak lain juga (posnya kurang).
+model MagangPenugasan {
+  id        Int      @id @default(autoincrement())
+  pesertaId Int
+  posId     Int
+  mulai     DateTime
+  minggu    Int
+  berbagi   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  peserta MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+  pos     MagangPos     @relation(fields: [posId], references: [id], onDelete: Cascade)
+
+  @@index([pesertaId, mulai])
+  @@index([posId])
+}
+
+// Tugas mengingat mingguan. senin = Senin minggu yang dinilai. jawabanKuis = salinan soal yang
+// dikerjakan + jawabannya (riwayat tidak berubah bila bank soal disunting). Kolom nilai praktik
+// (1–4) = ASPEK_PRAKTIK di lib/services/magang/nilai.ts.
+model MagangTugas {
+  id                Int       @id @default(autoincrement())
+  pesertaId         Int
+  senin             DateTime
+  posId             Int?
+  ingatan           String    @db.Text
+  jawabanKuis       Json
+  skorKuis          Int?
+  terlambat         Boolean   @default(false)
+  dikirimAt         DateTime  @default(now())
+  nilaiIngatan      Int?
+  ketelitian        Int?
+  kecepatan         Int?
+  inisiatif         Int?
+  sikap             Int?
+  nilai             Int?
+  catatanPembimbing String?   @db.Text
+  dinilaiOlehId     Int?
+  dinilaiAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  peserta     MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+  pos         MagangPos?    @relation(fields: [posId], references: [id], onDelete: SetNull)
+  dinilaiOleh User?         @relation("MagangPenilai", fields: [dinilaiOlehId], references: [id], onDelete: SetNull)
+
+  @@unique([pesertaId, senin])
+  @@index([posId])
+  @@index([dinilaiAt])
 }

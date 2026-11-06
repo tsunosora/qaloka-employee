@@ -19,6 +19,8 @@ export type PortalState = {
   authenticated: boolean;
   /** Kode fitur tab portal → termasuk paket atau tidak (lib/services/portal/keadaan.ts). */
   fitur?: Record<string, boolean>;
+  /** Peserta magang aktif → tab Magang tampil. */
+  magang?: boolean;
 };
 
 export type AttendanceRow = {

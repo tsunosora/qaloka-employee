@@ -1,11 +1,12 @@
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
 import { requireEmployeeByToken, portalSecret, viewerIsManager, managerModeRequested, type PortalEmployee } from "./auth";
 import { PORTAL_COOKIE, verifyPortalToken } from "./session";
 import { posproPinAvailable } from "@/lib/services/pospro/client";
 import { fiturTampil } from "@/lib/lisensi/penjaga";
 
 /** Kode fitur tab portal yang bisa tidak termasuk paket (tab lain = isi paket Kinerja). */
-export const FITUR_TAB_PORTAL = ["hr.overtime", "hr.reimbursement", "hr.visits", "hr.timesheet"] as const;
+export const FITUR_TAB_PORTAL = ["hr.overtime", "hr.reimbursement", "hr.visits", "hr.timesheet", "hr.assessment"] as const;
 
 /**
  * Keadaan layar PIN untuk satu tautan karyawan: identitas ringkas, PIN sudah dibuat atau
@@ -22,6 +23,8 @@ export async function keadaanPortal(req: Request, token: string): Promise<{
     authenticated: boolean;
     /** Tab portal yang fiturnya termasuk paket (kosmetik; rute API yang menolak sungguhan). */
     fitur: Record<string, boolean>;
+    /** Karyawan ini peserta magang aktif → tab Magang tampil. */
+    magang: boolean;
   };
 }> {
   const employee = await requireEmployeeByToken(token);
@@ -51,6 +54,7 @@ export async function keadaanPortal(req: Request, token: string): Promise<{
       asManager,
       authenticated: session?.employeeId === employee.id || asManager,
       fitur: await fiturTampil(FITUR_TAB_PORTAL),
+      magang: (await prisma.magangPeserta.count({ where: { employeeId: employee.id, aktif: true } })) > 0,
     },
   };
 }

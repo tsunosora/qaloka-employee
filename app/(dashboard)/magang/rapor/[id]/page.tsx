@@ -1,0 +1,201 @@
+"use client";
+
+import Link from "next/link";
+import { use, useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/fetcher";
+import { IconChevronLeft, IconDownload } from "@/components/ui/icons";
+import { longDate } from "@/components/portal/ui";
+import { ASPEK_PRAKTIK, SKALA, type AspekKey } from "@/lib/services/magang/nilai";
+import { NilaiTugas, type TugasAdmin } from "@/components/magang/NilaiTugas";
+import { Memuat, Pesan, tglPendek, warnaNilai } from "@/components/magang/ui";
+
+type Baris = {
+  posId: number;
+  nama: string;
+  mulai: string;
+  minggu: number;
+  tugasDikirim: number;
+  nilai: number | null;
+  predikat: string;
+  praktik: Record<AspekKey, number | null>;
+  deskripsi: string | null;
+  pembimbing: string | null;
+};
+type Payload = {
+  peserta: { id: number; nama: string; panggilan: string | null; sekolah: string | null; jurusan: string | null; mulai: string; selesai: string | null; catatan: string | null };
+  rapor: {
+    baris: Baris[];
+    nilaiAkhir: number | null;
+    predikat: string;
+    praktik: Record<AspekKey, number | null>;
+    rataKuis: number | null;
+    tugasDikirim: number;
+    tugasTerlambat: number;
+    mingguBerjalan: number;
+    jumlahPos: number;
+  };
+  tugas: Omit<TugasAdmin, "nama">[];
+};
+
+/** 3.4 → "Bisa sendiri" (label skala terdekat ke bawah). */
+function labelSkala(n: number | null): string {
+  if (n == null) return "—";
+  const s = [...SKALA].reverse().find((x) => n >= x.nilai - 0.25) ?? SKALA[0];
+  return s.label;
+}
+
+/** Baris target "- poin" → daftar poin tanpa tanda. */
+function poin(deskripsi: string | null): string[] {
+  return (deskripsi ?? "")
+    .split("\n")
+    .map((s) => s.replace(/^\s*[-•*]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+export default function RaporMagangPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const [data, setData] = useState<Payload | null>(null);
+  const [galat, setGalat] = useState("");
+  const [dinilai, setDinilai] = useState<TugasAdmin | null>(null);
+
+  const ambil = useCallback(() => api<Payload>(`/api/magang/peserta/${id}/rapor`), [id]);
+  const gagal = (e: unknown) => setGalat(e instanceof Error ? e.message : "Gagal memuat rapor.");
+  const muat = () => ambil().then(setData, gagal);
+  useEffect(() => {
+    let hidup = true;
+    ambil().then(
+      (d) => hidup && setData(d),
+      (e) => hidup && gagal(e)
+    );
+    return () => {
+      hidup = false;
+    };
+  }, [ambil]);
+
+  if (galat) return <Pesan jenis="galat">{galat}</Pesan>;
+  if (!data) return <Memuat baris={2} tinggi="h-48" />;
+  const { peserta: p, rapor: r } = data;
+
+  return (
+    <div className="mx-auto max-w-4xl space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <Link href="/magang/peserta" className="btn-ghost h-9 px-3 text-xs">
+          <IconChevronLeft /> Peserta
+        </Link>
+        <button className="btn-primary h-9 text-sm" onClick={() => window.print()}>
+          <IconDownload /> Cetak / simpan PDF
+        </button>
+      </div>
+
+      <article className="glass space-y-6 rounded-2xl p-6 print:rounded-none print:border-0 print:p-0 print:shadow-none">
+        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Rapor magang</p>
+            <h1 className="font-display text-2xl font-bold text-fg">{p.nama}</h1>
+            <p className="text-sm text-muted">{[p.sekolah, p.jurusan].filter(Boolean).join(" · ")}</p>
+            <p className="text-sm text-muted">
+              {longDate(p.mulai)} – {p.selesai ? longDate(p.selesai) : "sekarang"} · {r.mingguBerjalan} minggu · {r.jumlahPos} pos kerja
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-display text-4xl font-bold leading-none" style={{ color: warnaNilai(r.nilaiAkhir) }}>
+              {r.nilaiAkhir ?? "—"}
+            </p>
+            <p className="text-sm font-semibold text-fg">{r.predikat}</p>
+            <p className="text-xs text-muted">
+              Kuis rata-rata {r.rataKuis ?? "—"} · {r.tugasDikirim} tugas{r.tugasTerlambat ? `, ${r.tugasTerlambat} terlambat` : ""}
+            </p>
+          </div>
+        </header>
+
+        <section>
+          <h2 className="mb-2 text-sm font-bold text-fg">Sikap & cara kerja (rata-rata semua pos)</h2>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {ASPEK_PRAKTIK.map((a) => (
+              <div key={a.key} className="rounded-xl border border-border p-3">
+                <p className="text-xs text-muted">{a.label}</p>
+                <p className="font-display text-lg font-bold text-fg">{r.praktik[a.key] ?? "—"}<span className="text-xs font-normal text-subtle"> / 4</span></p>
+                <p className="text-xs text-muted">{labelSkala(r.praktik[a.key])}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="mb-2 text-sm font-bold text-fg">Pengalaman per pos kerja</h2>
+          {r.baris.length === 0 ? (
+            <p className="text-sm text-subtle">Belum ada pos yang dijalani.</p>
+          ) : (
+            <ol className="space-y-3">
+              {r.baris.map((b, i) => (
+                <li key={`${b.posId}-${b.mulai}`} className="break-inside-avoid rounded-xl border border-border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-display font-bold text-fg">
+                        {i + 1}. {b.nama}
+                      </h3>
+                      <p className="text-xs text-muted">
+                        {tglPendek(b.mulai)} · {b.minggu} minggu{b.pembimbing ? ` · pembimbing ${b.pembimbing}` : ""}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-display text-xl font-bold" style={{ color: warnaNilai(b.nilai) }}>
+                        {b.nilai ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted">{b.predikat}</p>
+                    </div>
+                  </div>
+                  {poin(b.deskripsi).length > 0 && (
+                    <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-fg">
+                      {poin(b.deskripsi).map((x) => (
+                        <li key={x}>{x}</li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-2 text-sm font-bold text-fg">Catatan pembimbing per minggu</h2>
+          {data.tugas.length === 0 ? (
+            <p className="text-sm text-subtle">Belum ada tugas mingguan.</p>
+          ) : (
+            <ul className="space-y-2">
+              {data.tugas.map((t) => (
+                <li key={t.id} className="break-inside-avoid rounded-xl bg-surface-2 p-3 text-sm print:border print:border-border print:bg-transparent">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-fg">
+                      Minggu {tglPendek(t.senin)} · {t.pos}
+                    </p>
+                    <p className="text-xs text-muted">
+                      Kuis {t.skorKuis ?? "—"} · Nilai{" "}
+                      <b style={{ color: warnaNilai(t.nilai) }}>{t.nilai ?? "belum dinilai"}</b>
+                      <button className="ml-2 font-semibold text-primary hover:underline print:hidden" onClick={() => setDinilai({ ...t, nama: p.panggilan || p.nama })}>
+                        {t.dinilaiAt ? "Ubah nilai" : "Nilai"}
+                      </button>
+                    </p>
+                  </div>
+                  {t.catatanPembimbing && <p className="mt-1 whitespace-pre-wrap text-fg">{t.catatanPembimbing}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </article>
+
+      {dinilai && (
+        <NilaiTugas
+          tugas={dinilai}
+          onClose={() => setDinilai(null)}
+          onSaved={() => {
+            setDinilai(null);
+            muat();
+          }}
+        />
+      )}
+    </div>
+  );
+}
