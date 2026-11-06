@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, notFound, route } from "@/lib/http";
-import { toYmd } from "@/lib/services/leave/service";
+import { atMidnight, toYmd } from "@/lib/services/leave/service";
+import { hariKerja, kerajinan } from "@/lib/services/magang/jurnal";
+import { serialisasiJurnal } from "@/lib/services/magang/jurnal-db";
 import { hariIni, keYmd, serialisasiTugas } from "@/lib/services/magang/layanan";
 import { seninDari } from "@/lib/services/magang/rotasi";
 import { susunRapor } from "@/lib/services/magang/rapor";
@@ -31,7 +33,30 @@ export const GET = route<Ctx>(async (_req, ctx) => {
     sampai: seninDari(hariIni()),
   });
   const infoPos = new Map(pos.map((x) => [x.id, { deskripsi: x.deskripsi, pembimbing: x.pembimbing?.fullName ?? null }]));
+
+  // Kerajinan jurnal: hari kerja (Senin–Sabtu, tanpa libur nasional) dari mulai s.d. hari ini/selesai.
+  const mulai = toYmd(p.mulai);
+  const hari = hariIni();
+  const sampai = p.selesai && toYmd(p.selesai) < hari ? toYmd(p.selesai) : hari;
+  const [libur, jurnalBaris] = await Promise.all([
+    sampai >= mulai ? prisma.holiday.findMany({ where: { date: { gte: atMidnight(mulai), lte: atMidnight(sampai) } }, select: { date: true } }) : [],
+    prisma.magangJurnal.findMany({
+      where: { pesertaId: p.id },
+      orderBy: { tanggal: "desc" },
+      include: { pos: { select: { nama: true } }, dicekOleh: { select: { name: true } } },
+    }),
+  ]);
+  const hariKerjaList = sampai >= mulai ? hariKerja(mulai, sampai, new Set(libur.map((l) => toYmd(l.date)))) : [];
+  const jurnal = kerajinan(jurnalBaris.map((j) => toYmd(j.tanggal)), hariKerjaList);
+
   return json({
+    jurnal,
+    daftarJurnal: jurnalBaris.map((j) => ({
+      ...serialisasiJurnal(j),
+      pesertaId: p.id,
+      nama: p.employee.nickname || p.employee.fullName,
+      dicekOleh: j.dicekOleh?.name ?? null,
+    })),
     peserta: {
       id: p.id,
       nama: p.employee.fullName,

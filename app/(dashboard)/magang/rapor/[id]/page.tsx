@@ -7,6 +7,7 @@ import { IconChevronLeft, IconDownload } from "@/components/ui/icons";
 import { longDate } from "@/components/portal/ui";
 import { ASPEK_PRAKTIK, SKALA, type AspekKey } from "@/lib/services/magang/nilai";
 import { NilaiTugas, type TugasAdmin } from "@/components/magang/NilaiTugas";
+import { DaftarJurnal, type JurnalAdmin } from "@/components/magang/DaftarJurnal";
 import { Memuat, Pesan, tglPendek, warnaNilai } from "@/components/magang/ui";
 
 type Baris = {
@@ -35,6 +36,8 @@ type Payload = {
     jumlahPos: number;
   };
   tugas: Omit<TugasAdmin, "nama">[];
+  jurnal: { terisi: number; dari: number; persen: number | null };
+  daftarJurnal: JurnalAdmin[];
 };
 
 /** 3.4 → "Bisa sendiri" (label skala terdekat ke bawah). */
@@ -104,6 +107,10 @@ export default function RaporMagangPage({ params }: { params: Promise<{ id: stri
             <p className="text-sm font-semibold text-fg">{r.predikat}</p>
             <p className="text-xs text-muted">
               Kuis rata-rata {r.rataKuis ?? "—"} · {r.tugasDikirim} tugas{r.tugasTerlambat ? `, ${r.tugasTerlambat} terlambat` : ""}
+            </p>
+            <p className="text-xs text-muted">
+              Jurnal harian terisi <b className="text-fg">{data.jurnal.terisi}</b> dari {data.jurnal.dari} hari kerja
+              {data.jurnal.persen != null && ` (${data.jurnal.persen}%)`}
             </p>
           </div>
         </header>
@@ -185,6 +192,15 @@ export default function RaporMagangPage({ params }: { params: Promise<{ id: stri
           )}
         </section>
       </article>
+
+      <section className="print:hidden">
+        <h2 className="mb-2 text-sm font-bold text-fg">Jurnal harian ({data.daftarJurnal.length})</h2>
+        {data.daftarJurnal.length === 0 ? (
+          <p className="text-sm text-subtle">Belum ada jurnal.</p>
+        ) : (
+          <DaftarJurnal items={data.daftarJurnal} tampilNama={false} onDicek={() => muat()} />
+        )}
+      </section>
 
       {dinilai && (
         <NilaiTugas

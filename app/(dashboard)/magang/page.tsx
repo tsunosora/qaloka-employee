@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/fetcher";
 import { IconArrowRight, IconCheck } from "@/components/ui/icons";
 import { NilaiTugas, type TugasAdmin } from "@/components/magang/NilaiTugas";
+import { DaftarJurnal, type JurnalAdmin } from "@/components/magang/DaftarJurnal";
 import { ChipStatus, Judul, Kosong, Memuat, Pesan, tglPendek, warnaNilai, type StatusTugas } from "@/components/magang/ui";
 
 type Anak = {
@@ -20,6 +21,7 @@ type Anak = {
   tugasLalu: StatusTugas;
   rataNilai: number | null;
   adaRotasi: boolean;
+  jurnalHariIni: boolean;
 };
 type Ringkasan = { hariIni: string; seninIni: string; jumlahPos: number; belumDinilai: number; peserta: Anak[] };
 
@@ -30,13 +32,21 @@ export default function MagangPage() {
   const [notice, setNotice] = useState("");
   const [dinilai, setDinilai] = useState<TugasAdmin | null>(null);
 
+  const [jurnal, setJurnal] = useState<JurnalAdmin[] | null>(null);
+
   const ambil = useCallback(
-    () => Promise.all([api<Ringkasan>("/api/magang"), api<{ items: TugasAdmin[] }>("/api/magang/tugas?status=belum")]),
+    () =>
+      Promise.all([
+        api<Ringkasan>("/api/magang"),
+        api<{ items: TugasAdmin[] }>("/api/magang/tugas?status=belum"),
+        api<{ items: JurnalAdmin[] }>("/api/magang/jurnal?status=belum"),
+      ]),
     []
   );
-  const pasang = ([r, t]: [Ringkasan, { items: TugasAdmin[] }]) => {
+  const pasang = ([r, t, j]: [Ringkasan, { items: TugasAdmin[] }, { items: JurnalAdmin[] }]) => {
     setData(r);
     setTugas(t.items);
+    setJurnal(j.items);
   };
   const gagal = (e: unknown) => setGalat(e instanceof Error ? e.message : "Gagal memuat data.");
   const muat = () => ambil().then(pasang, gagal);
@@ -55,7 +65,7 @@ export default function MagangPage() {
   const langkah = data
     ? [
         { selesai: data.jumlahPos > 0, teks: "Atur pos kerja & bank soal", href: "/magang/pos" },
-        { selesai: data.peserta.length > 0, teks: "Daftarkan anak magang (dari Direktori)", href: "/magang/peserta" },
+        { selesai: data.peserta.length > 0, teks: "Tambahkan anak magang (atau bagikan tautan pendaftaran)", href: "/magang/peserta" },
         { selesai: data.peserta.length > 0 && tanpaRotasi === 0, teks: "Susun rotasi pos", href: "/magang/rotasi" },
       ]
     : [];
@@ -135,7 +145,13 @@ export default function MagangPage() {
                         <p className="text-[11px] text-subtle">rata-rata</p>
                       </div>
                     </div>
-                    <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <dt className="text-subtle">Jurnal hari ini</dt>
+                        <dd className="mt-0.5">
+                          <ChipStatus status={p.jurnalHariIni ? "dinilai" : "belum-diisi"} label={p.jurnalHariIni ? "Sudah diisi" : "Belum diisi"} />
+                        </dd>
+                      </div>
                       <div>
                         <dt className="text-subtle">Tugas minggu lalu</dt>
                         <dd className="mt-0.5">
@@ -189,6 +205,25 @@ export default function MagangPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-2 text-sm font-bold text-fg">
+              Jurnal harian belum dicek {jurnal && jurnal.length > 0 && <span className="text-warning">({jurnal.length})</span>}
+            </h2>
+            {!jurnal ? (
+              <Memuat baris={2} tinggi="h-16" />
+            ) : jurnal.length === 0 ? (
+              <Kosong>Semua jurnal yang masuk sudah dicek.</Kosong>
+            ) : (
+              <DaftarJurnal
+                items={jurnal}
+                onDicek={(nama) => {
+                  setNotice(`Jurnal ${nama} ditandai sudah dicek.`);
+                  muat();
+                }}
+              />
             )}
           </section>
         </>

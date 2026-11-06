@@ -74,6 +74,7 @@ export const ATURAN_API: readonly Aturan[] = [
   // tanpa kode fitur baru (paket Kinerja).
   { awalan: "/api/magang", fitur: "hr.assessment" },
   { awalan: "/api/public/portal/*/magang", fitur: "hr.assessment" },
+  { awalan: "/api/public/daftar-magang", fitur: "hr.assessment" },
 
   { awalan: "/api/public/employee", fitur: "hr.guest_rating" },
   { awalan: "/api/public/portal", fitur: "hr.portal" },
@@ -97,6 +98,7 @@ export const ATURAN_HALAMAN: readonly Aturan[] = [
   { awalan: "/assessments", fitur: "hr.assessment" },
   { awalan: "/reports", fitur: "hr.assessment" },
   { awalan: "/magang", fitur: "hr.assessment" },
+  { awalan: "/daftar-magang", fitur: "hr.assessment" },
   { awalan: "/settings/work-schedules", fitur: "hr.schedule" },
   { awalan: "/rate", fitur: "hr.guest_rating" },
   { awalan: "/me", fitur: "hr.portal" },

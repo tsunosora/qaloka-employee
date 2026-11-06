@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, route } from "@/lib/http";
-import { toYmd } from "@/lib/services/leave/service";
+import { atMidnight, toYmd } from "@/lib/services/leave/service";
 import { hariIni, keYmd } from "@/lib/services/magang/layanan";
 import { seninDari, tambahMinggu, penugasanPada, mingguKe } from "@/lib/services/magang/rotasi";
 import { keadaanJendela } from "@/lib/services/magang/nilai";
@@ -20,6 +20,7 @@ export const GET = route(async () => {
         employee: { select: { fullName: true, nickname: true, publicToken: true } },
         penugasan: { orderBy: { mulai: "asc" } },
         tugas: { select: { senin: true, nilai: true, dinilaiAt: true } },
+        jurnal: { where: { tanggal: atMidnight(hari) }, select: { id: true } },
       },
     }),
     prisma.magangPos.findMany({ select: { id: true, nama: true, pembimbing: { select: { fullName: true } } } }),
@@ -68,6 +69,7 @@ export const GET = route(async () => {
         tugasLalu: statusTugas(tugasMap.get(seninLalu), seninLalu, !!lalu),
         rataNilai: nilai.length ? Math.round(nilai.reduce((s, n) => s + n, 0) / nilai.length) : null,
         adaRotasi: pen.length > 0,
+        jurnalHariIni: p.jurnal.length > 0,
       };
     }),
   });

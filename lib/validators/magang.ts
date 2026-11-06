@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAKS_INGATAN, MIN_INGATAN } from "@/lib/services/magang/nilai";
+import { MIN_KEGIATAN, MAKS_KEGIATAN } from "@/lib/services/magang/jurnal";
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD");
 const teksOpsional = (maks: number) =>
@@ -71,3 +72,74 @@ export const kirimTugasSchema = z.object({
     .max(MAKS_INGATAN),
   jawaban: z.record(z.string(), z.number().int().min(0).max(9).nullable()).default({}),
 });
+
+// ── Jurnal harian & pendaftaran (7 Nov 2026) ─────────────────────────────────────────────────
+
+/** Jurnal dari portal (multipart → objek). hapusFoto = indeks foto lama yang dibuang, mis. "0,2". */
+export const jurnalSchema = z.object({
+  tanggal: ymd,
+  kegiatan: z
+    .string()
+    .trim()
+    .min(MIN_KEGIATAN, `Ceritakan lebih lengkap — minimal ${MIN_KEGIATAN} huruf`)
+    .max(MAKS_KEGIATAN),
+  kendala: teksOpsional(2000),
+  hapusFoto: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(",").map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < 10) : [])),
+});
+
+export const cekJurnalSchema = z.object({ komentar: teksOpsional(2000) });
+
+export const tautanDaftarSchema = z
+  .object({
+    label: z.string().trim().min(2, "Beri nama, mis. PKL SMK Juli 2027").max(100),
+    berlakuSampai: ymd,
+    mulaiMagang: ymd.nullable().optional(),
+    selesaiMagang: ymd.nullable().optional(),
+  })
+  .refine((d) => !d.mulaiMagang || !d.selesaiMagang || d.selesaiMagang >= d.mulaiMagang, {
+    message: "Tanggal selesai sebelum tanggal mulai",
+    path: ["selesaiMagang"],
+  });
+
+const pinMentah = z.string().min(1, "PIN wajib diisi").max(32);
+
+/** Formulir pendaftaran mandiri (publik). */
+export const pendaftaranSchema = z
+  .object({
+    namaLengkap: z.string().trim().min(3, "Tulis nama lengkap").max(150),
+    panggilan: teksOpsional(50),
+    hp: z
+      .string()
+      .trim()
+      .regex(/^[0-9+\s-]{8,20}$/, "Nomor HP tidak sah")
+      .transform((v) => v.replace(/[\s-]/g, "")),
+    sekolah: z.string().trim().min(2, "Tulis nama sekolah/kampus").max(150),
+    jurusan: teksOpsional(100),
+    mulai: ymd,
+    selesai: ymd.nullable().optional(),
+    pin: pinMentah,
+    confirm: pinMentah,
+  })
+  .refine((d) => d.pin === d.confirm, { message: "Ulangi PIN tidak sama.", path: ["confirm"] })
+  .refine((d) => !d.selesai || d.selesai >= d.mulai, { message: "Tanggal selesai sebelum tanggal mulai", path: ["selesai"] });
+
+export const keputusanPendaftarSchema = z
+  .object({ aksi: z.enum(["setujui", "tolak"]), alasan: teksOpsional(255) })
+  .refine((d) => d.aksi !== "tolak" || !!d.alasan, { message: "Tulis alasan penolakan", path: ["alasan"] });
+
+/** Pengawas membuat akun anak sekaligus (tanpa lewat Direktori). */
+export const pesertaBaruSchema = z
+  .object({
+    namaLengkap: z.string().trim().min(3).max(150),
+    panggilan: teksOpsional(50),
+    hp: teksOpsional(30),
+    sekolah: teksOpsional(150),
+    jurusan: teksOpsional(100),
+    mulai: ymd,
+    selesai: ymd.nullable().optional(),
+    catatan: teksOpsional(2000),
+  })
+  .refine((p) => !p.selesai || p.selesai >= p.mulai, { message: "Tanggal selesai sebelum tanggal mulai", path: ["selesai"] });

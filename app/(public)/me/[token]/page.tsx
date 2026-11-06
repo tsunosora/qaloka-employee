@@ -56,7 +56,9 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
       : "";
 
   const [state, setState] = useState<PortalState | null>(null);
-  const [invalid, setInvalid] = useState(false);
+  // Pesan bila tautan tidak bisa dibuka (null = tidak ada galat). Pendaftar magang yang belum
+  // disetujui mendapat pesan dari server ("menunggu persetujuan"), bukan pesan umum.
+  const [invalid, setInvalid] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("overview");
   const [{ year, month }, setPeriod] = useState(currentMonth);
   const [data, setData] = useState<Overview | null>(null);
@@ -81,8 +83,8 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
       setState(s);
       // Anak magang membuka halaman ini terutama untuk pos & tugas mingguannya.
       if (s.magang && s.fitur?.["hr.assessment"] !== false) setTab((t) => (t === "overview" ? "magang" : t));
-    } catch {
-      setInvalid(true);
+    } catch (e) {
+      setInvalid(e instanceof Error && e.message ? e.message : "Tautan tidak valid atau karyawan sudah tidak aktif.");
     }
   }, [token, ownerQuery]);
 
@@ -123,7 +125,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
           >
             <IconAlert className="text-[26px]" />
           </span>
-          <p className="text-muted">Tautan tidak valid atau karyawan sudah tidak aktif.</p>
+          <p className="text-muted">{invalid}</p>
         </div>
       </Centered>
     );

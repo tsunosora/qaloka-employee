@@ -18,11 +18,11 @@ const STATUS: Record<StatusTugas, { label: string; warna: string }> = {
   terlambat: { label: "Terlambat, belum diisi", warna: "var(--danger)" },
 };
 
-export function ChipStatus({ status }: { status: StatusTugas }) {
+export function ChipStatus({ status, label }: { status: StatusTugas; label?: string }) {
   const s = STATUS[status];
   return (
     <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold" style={{ ...soft(s.warna, 18), color: s.warna }}>
-      {s.label}
+      {label ?? s.label}
     </span>
   );
 }

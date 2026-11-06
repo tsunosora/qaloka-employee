@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/Modal";
 import { IconCopy, IconPencil, IconPlus } from "@/components/ui/icons";
 import { longDate } from "@/components/portal/ui";
 import { Judul, Kosong, Memuat, Pesan } from "@/components/magang/ui";
+import { Pendaftaran } from "@/components/magang/Pendaftaran";
 
 type Peserta = {
   id: number;
@@ -22,7 +23,21 @@ type Peserta = {
   catatan: string | null;
 };
 type Payload = { peserta: Peserta[]; calon: { id: number; fullName: string; employeeCode: string }[] };
-type Form = { id?: number; employeeId: string; sekolah: string; jurusan: string; mulai: string; selesai: string; aktif: boolean; catatan: string };
+type Form = {
+  id?: number;
+  /** "baru" = buat akun karyawan sekaligus; "direktori" = pilih karyawan yang sudah ada. */
+  mode: "baru" | "direktori";
+  employeeId: string;
+  namaLengkap: string;
+  panggilan: string;
+  hp: string;
+  sekolah: string;
+  jurusan: string;
+  mulai: string;
+  selesai: string;
+  aktif: boolean;
+  catatan: string;
+};
 
 function hariIni(): string {
   const d = new Date();
@@ -56,22 +71,46 @@ export default function PesertaMagangPage() {
     };
   }, [ambil]);
 
+  const pesan = (ok: boolean, teks: string) => {
+    if (ok) {
+      setNotice(teks);
+      setGalat("");
+    } else setGalat(teks);
+  };
+
+  async function salinKe(token: string, nama: string) {
+    await navigator.clipboard.writeText(`${window.location.origin}/me/${token}`).catch(() => {});
+    setNotice(`Tautan halaman pribadi ${nama} disalin. Kirim ke anaknya lewat WhatsApp; saat pertama dibuka dia membuat PIN sendiri.`);
+  }
+
   async function simpan() {
     if (!form) return;
     setBusy(true);
     setGalat("");
     try {
-      const body = JSON.stringify({
-        employeeId: Number(form.employeeId),
+      const umum = {
         sekolah: form.sekolah || null,
         jurusan: form.jurusan || null,
         mulai: form.mulai,
         selesai: form.selesai || null,
-        aktif: form.aktif,
         catatan: form.catatan || null,
-      });
-      await api(form.id ? `/api/magang/peserta/${form.id}` : "/api/magang/peserta", { method: form.id ? "PATCH" : "POST", body });
-      setNotice(form.id ? "Data peserta tersimpan." : "Peserta ditambahkan. Susun ulang rotasi supaya dia dapat jadwal pos.");
+      };
+      if (form.id) {
+        await api(`/api/magang/peserta/${form.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ ...umum, employeeId: Number(form.employeeId), aktif: form.aktif }),
+        });
+        setNotice("Data peserta tersimpan.");
+      } else if (form.mode === "baru") {
+        const r = await api<{ publicToken: string }>("/api/magang/peserta/baru", {
+          method: "POST",
+          body: JSON.stringify({ ...umum, namaLengkap: form.namaLengkap, panggilan: form.panggilan || null, hp: form.hp || null }),
+        });
+        await salinKe(r.publicToken, form.panggilan || form.namaLengkap);
+      } else {
+        await api("/api/magang/peserta", { method: "POST", body: JSON.stringify({ ...umum, employeeId: Number(form.employeeId) }) });
+        setNotice("Peserta ditambahkan. Susun ulang rotasi supaya dia dapat jadwal pos.");
+      }
       setForm(null);
       await muat();
     } catch (e) {
@@ -81,27 +120,22 @@ export default function PesertaMagangPage() {
     }
   }
 
-  async function salinTautan(p: Peserta) {
-    if (!p.publicToken) return;
-    await navigator.clipboard.writeText(`${window.location.origin}/me/${p.publicToken}`).catch(() => {});
-    setNotice(`Tautan halaman pribadi ${p.panggilan || p.nama} disalin. Kirim ke anaknya; dia masuk dengan PIN portal.`);
-  }
-
   const aktif = data?.peserta.filter((p) => p.aktif) ?? [];
   const selesai = data?.peserta.filter((p) => !p.aktif) ?? [];
+  const siap = form && form.mulai && (form.id || (form.mode === "baru" ? form.namaLengkap.trim().length >= 3 : !!form.employeeId));
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <Judul
         judul="Peserta Magang"
-        keterangan="Anak magang/PKL didaftarkan dulu sebagai karyawan di Direktori (supaya punya halaman pribadi & PIN), lalu ditambahkan di sini. Tugas mingguan diisi dari halaman pribadinya, tab Magang."
+        keterangan="Tambahkan anak magang langsung di sini, atau bagikan tautan pendaftaran supaya mereka mendaftar sendiri (Anda tinggal menyetujui). Tiap anak punya halaman pribadi di HP untuk jurnal harian & tugas mingguan."
         aksi={
           <button
             className="btn-primary h-10 text-sm"
             disabled={!data}
             onClick={() => {
               const mulai = hariIni();
-              setForm({ employeeId: "", sekolah: "", jurusan: "", mulai, selesai: tigaBulan(mulai), aktif: true, catatan: "" });
+              setForm({ mode: "baru", employeeId: "", namaLengkap: "", panggilan: "", hp: "", sekolah: "", jurusan: "", mulai, selesai: tigaBulan(mulai), aktif: true, catatan: "" });
             }}
           >
             <IconPlus className="text-[16px]" /> Tambah peserta
@@ -111,71 +145,113 @@ export default function PesertaMagangPage() {
       {notice && <Pesan jenis="ok">{notice}</Pesan>}
       {galat && <Pesan jenis="galat">{galat}</Pesan>}
 
+      <Pendaftaran hariIni={hariIni()} onBerubah={muat} onPesan={pesan} />
+
       {!data ? (
         <Memuat />
       ) : data.peserta.length === 0 ? (
         <Kosong>Belum ada peserta magang.</Kosong>
       ) : (
-        <>
-          {[
-            { judul: `Aktif (${aktif.length})`, daftar: aktif },
-            { judul: `Selesai / nonaktif (${selesai.length})`, daftar: selesai },
-          ]
-            .filter((g) => g.daftar.length > 0)
-            .map((g) => (
-              <section key={g.judul}>
-                <h2 className="mb-2 text-sm font-bold text-fg">{g.judul}</h2>
-                <ul className="space-y-2">
-                  {g.daftar.map((p) => (
-                    <li key={p.id} className="glass flex flex-wrap items-center gap-3 rounded-2xl p-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-fg">
-                          {p.nama} {p.panggilan && <span className="font-normal text-muted">({p.panggilan})</span>}
-                        </p>
-                        <p className="text-sm text-muted">
-                          {[p.sekolah, p.jurusan].filter(Boolean).join(" · ") || "Sekolah belum diisi"} · {longDate(p.mulai)} – {p.selesai ? longDate(p.selesai) : "belum ditentukan"}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {p.publicToken && (
-                          <button className="btn-ghost h-9 px-3 text-xs" onClick={() => salinTautan(p)}>
-                            <IconCopy /> Tautan HP
-                          </button>
-                        )}
-                        <Link href={`/magang/rapor/${p.id}`} className="btn-ghost h-9 px-3 text-xs">
-                          Rapor
-                        </Link>
-                        <button
-                          className="btn-ghost h-9 px-3 text-xs"
-                          aria-label={`Ubah ${p.nama}`}
-                          onClick={() =>
-                            setForm({
-                              id: p.id,
-                              employeeId: String(p.employeeId),
-                              sekolah: p.sekolah ?? "",
-                              jurusan: p.jurusan ?? "",
-                              mulai: p.mulai,
-                              selesai: p.selesai ?? "",
-                              aktif: p.aktif,
-                              catatan: p.catatan ?? "",
-                            })
-                          }
-                        >
-                          <IconPencil /> Ubah
+        [
+          { judul: `Aktif (${aktif.length})`, daftar: aktif },
+          { judul: `Selesai / nonaktif (${selesai.length})`, daftar: selesai },
+        ]
+          .filter((g) => g.daftar.length > 0)
+          .map((g) => (
+            <section key={g.judul}>
+              <h2 className="mb-2 text-sm font-bold text-fg">{g.judul}</h2>
+              <ul className="space-y-2">
+                {g.daftar.map((p) => (
+                  <li key={p.id} className="glass flex flex-wrap items-center gap-3 rounded-2xl p-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-fg">
+                        {p.nama} {p.panggilan && <span className="font-normal text-muted">({p.panggilan})</span>}
+                      </p>
+                      <p className="text-sm text-muted">
+                        {[p.sekolah, p.jurusan].filter(Boolean).join(" · ") || "Sekolah belum diisi"} · {longDate(p.mulai)} – {p.selesai ? longDate(p.selesai) : "belum ditentukan"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {p.publicToken && (
+                        <button className="btn-ghost h-9 px-3 text-xs" onClick={() => salinKe(p.publicToken!, p.panggilan || p.nama)}>
+                          <IconCopy /> Tautan HP
                         </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-        </>
+                      )}
+                      <Link href={`/magang/rapor/${p.id}`} className="btn-ghost h-9 px-3 text-xs">
+                        Rapor
+                      </Link>
+                      <button
+                        className="btn-ghost h-9 px-3 text-xs"
+                        aria-label={`Ubah ${p.nama}`}
+                        onClick={() =>
+                          setForm({
+                            id: p.id,
+                            mode: "direktori",
+                            employeeId: String(p.employeeId),
+                            namaLengkap: p.nama,
+                            panggilan: p.panggilan ?? "",
+                            hp: "",
+                            sekolah: p.sekolah ?? "",
+                            jurusan: p.jurusan ?? "",
+                            mulai: p.mulai,
+                            selesai: p.selesai ?? "",
+                            aktif: p.aktif,
+                            catatan: p.catatan ?? "",
+                          })
+                        }
+                      >
+                        <IconPencil /> Ubah
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
       )}
 
       {form && (
-        <Modal title={form.id ? "Ubah peserta" : "Tambah peserta magang"} onClose={() => setForm(null)}>
+        <Modal title={form.id ? `Ubah ${form.namaLengkap}` : "Tambah peserta magang"} onClose={() => setForm(null)}>
           <div className="space-y-4">
             {!form.id && (
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cara menambah">
+                {(
+                  [
+                    { k: "baru", judul: "Buat akun baru", bantu: "Untuk anak yang belum ada di sistem" },
+                    { k: "direktori", judul: "Pilih dari Direktori", bantu: "Sudah terdaftar sebagai karyawan" },
+                  ] as const
+                ).map((o) => (
+                  <button
+                    key={o.k}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.mode === o.k}
+                    onClick={() => setForm({ ...form, mode: o.k })}
+                    className={`rounded-xl border p-3 text-left text-sm transition ${form.mode === o.k ? "border-primary bg-primary/10" : "border-border hover:border-border-strong"}`}
+                  >
+                    <span className="block font-semibold text-fg">{o.judul}</span>
+                    <span className="text-xs text-muted">{o.bantu}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {!form.id && form.mode === "baru" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block sm:col-span-2">
+                  <span className="text-sm font-semibold text-fg">Nama lengkap</span>
+                  <input className="input mt-1.5" value={form.namaLengkap} maxLength={150} onChange={(e) => setForm({ ...form, namaLengkap: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-fg">Nama panggilan</span>
+                  <input className="input mt-1.5" value={form.panggilan} maxLength={50} onChange={(e) => setForm({ ...form, panggilan: e.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-semibold text-fg">Nomor HP</span>
+                  <input className="input mt-1.5" value={form.hp} maxLength={30} inputMode="tel" onChange={(e) => setForm({ ...form, hp: e.target.value })} />
+                </label>
+              </div>
+            )}
+            {!form.id && form.mode === "direktori" && (
               <label className="block">
                 <span className="text-sm font-semibold text-fg">Karyawan</span>
                 <select className="input mt-1.5" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })}>
@@ -186,13 +262,6 @@ export default function PesertaMagangPage() {
                     </option>
                   ))}
                 </select>
-                <span className="mt-1 block text-xs text-muted">
-                  Belum ada di daftar? Tambahkan dulu di{" "}
-                  <Link href="/employees" className="font-semibold text-primary hover:underline">
-                    Direktori
-                  </Link>
-                  .
-                </span>
               </label>
             )}
             <div className="grid gap-3 sm:grid-cols-2">
@@ -223,11 +292,14 @@ export default function PesertaMagangPage() {
                 Masih magang (hilangkan centang bila sudah selesai — rapornya tetap tersimpan)
               </label>
             )}
+            {!form.id && form.mode === "baru" && (
+              <p className="text-xs text-muted">Sesudah disimpan, tautan halaman pribadinya langsung tersalin — kirim ke anaknya. Dia membuat PIN sendiri saat pertama membuka.</p>
+            )}
             <div className="flex justify-end gap-2 border-t border-border pt-4">
               <button className="btn-ghost h-10 text-sm" onClick={() => setForm(null)}>
                 Batal
               </button>
-              <button className="btn-primary h-10 text-sm" onClick={simpan} disabled={busy || !form.employeeId || !form.mulai}>
+              <button className="btn-primary h-10 text-sm" onClick={simpan} disabled={busy || !siap}>
                 {busy ? "Menyimpan…" : "Simpan"}
               </button>
             </div>

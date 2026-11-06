@@ -70,6 +70,7 @@ model User {
   absenTimDecisions   AbsenTimBaris[]   @relation("AbsenTimDecider")
   rekapDecisions      RekapHarian[]     @relation("RekapDecider")
   magangDinilai       MagangTugas[]     @relation("MagangPenilai")
+  magangJurnalDicek   MagangJurnal[]    @relation("MagangJurnalCek")
 }
 
 model Department {
@@ -1011,6 +1012,7 @@ model MagangPos {
   soal       MagangSoal[]
   penugasan  MagangPenugasan[]
   tugas      MagangTugas[]
+  jurnal     MagangJurnal[]
 
   @@index([pembimbingId])
 }
@@ -1046,6 +1048,7 @@ model MagangPeserta {
   employee  Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   penugasan MagangPenugasan[]
   tugas     MagangTugas[]
+  jurnal    MagangJurnal[]
 }
 
 // Satu blok rotasi: anak memegang pos `posId` selama `minggu` minggu mulai Senin `mulai`.
@@ -1098,4 +1101,69 @@ model MagangTugas {
   @@unique([pesertaId, senin])
   @@index([posId])
   @@index([dinilaiAt])
+}
+
+// Jurnal harian anak magang (7 Nov 2026): apa yang dikerjakan hari itu + foto (maks 3, path di
+// storage/magang) + kendala. Satu baris per anak per tanggal; anak boleh menyunting sampai dicek
+// pembimbing. Rapor hanya memakai kelengkapannya (kerajinan), bukan nilainya.
+model MagangJurnal {
+  id          Int       @id @default(autoincrement())
+  pesertaId   Int
+  tanggal     DateTime
+  posId       Int?
+  kegiatan    String    @db.Text
+  kendala     String?   @db.Text
+  foto        Json
+  komentar    String?   @db.Text
+  dicekAt     DateTime?
+  dicekOlehId Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  peserta   MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+  pos       MagangPos?    @relation(fields: [posId], references: [id], onDelete: SetNull)
+  dicekOleh User?         @relation("MagangJurnalCek", fields: [dicekOlehId], references: [id], onDelete: SetNull)
+
+  @@unique([pesertaId, tanggal])
+  @@index([dicekAt])
+}
+
+// Tautan pendaftaran mandiri. Anak yang mendaftar masuk MagangPendaftar (BUKAN Employee) sampai
+// disetujui pengawas — tidak memakan kuota karyawan, tidak muncul di Direktori/absensi.
+model MagangDaftar {
+  id            Int       @id @default(autoincrement())
+  kode          String    @unique @db.VarChar(36)
+  label         String    @db.VarChar(100)
+  berlakuSampai DateTime
+  mulaiMagang   DateTime?
+  selesaiMagang DateTime?
+  aktif         Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  pendaftar MagangPendaftar[]
+}
+
+// token = publicToken karyawan nanti (tautan HP yang dipegang anak tidak berubah sesudah
+// disetujui). pinHash = PIN portal yang dibuat anak saat mendaftar (bcrypt).
+model MagangPendaftar {
+  id           Int       @id @default(autoincrement())
+  daftarId     Int
+  token        String    @unique @db.VarChar(36)
+  namaLengkap  String    @db.VarChar(150)
+  panggilan    String?   @db.VarChar(50)
+  hp           String?   @db.VarChar(30)
+  sekolah      String?   @db.VarChar(150)
+  jurusan      String?   @db.VarChar(100)
+  mulai        DateTime
+  selesai      DateTime?
+  pinHash      String    @db.VarChar(100)
+  status       String    @default("menunggu") @db.VarChar(20) // menunggu | disetujui | ditolak
+  alasanTolak  String?   @db.VarChar(255)
+  employeeId   Int?
+  diputusAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  daftar MagangDaftar @relation(fields: [daftarId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }

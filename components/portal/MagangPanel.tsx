@@ -5,6 +5,7 @@ import { api } from "@/lib/fetcher";
 import { IconAlert, IconCheck, IconX } from "@/components/ui/icons";
 import { Card, longDate, soft } from "@/components/portal/ui";
 import { tglPendek, warnaNilai } from "@/components/magang/ui";
+import { JurnalMagang } from "@/components/portal/JurnalMagang";
 
 type Soal = { id: number; pertanyaan: string; pilihan: string[] };
 type Terbuka = { senin: string; buka: string; batas: string; keadaan: "buka" | "terlambat"; pos: string; mingguKe: number; dari: number; soal: Soal[] };
@@ -110,6 +111,8 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
           <p className="text-sm text-muted">Minggu ini kamu belum dijadwalkan di pos mana pun. Tanyakan ke pembimbing.</p>
         )}
       </Card>
+
+      <JurnalMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
       {data.tugasTerbuka.length === 0 ? (
         <Card title="Tugas mengingat">
