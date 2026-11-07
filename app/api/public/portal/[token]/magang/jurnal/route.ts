@@ -21,7 +21,7 @@ export const GET = route<Ctx>(async (req, ctx) => {
   const p = await pesertaPortal(employee.id);
   if (!p) return json({ peserta: false });
 
-  const bolehIsi = tanggalBolehIsi(p.hari, p.masa);
+  const bolehIsi = tanggalBolehIsi(p.hari, p.masa, p.libur);
   const isian = await prisma.magangJurnal.findMany({
     where: {
       pesertaId: p.id,
@@ -38,7 +38,7 @@ export const GET = route<Ctx>(async (req, ctx) => {
     riwayatDitahan: p.tugasTerbuka,
     maksFoto: MAKS_FOTO,
     minKegiatan: MIN_KEGIATAN,
-    isian: isian.map((j) => serialisasiJurnal(j, { hari: p.hari, masa: p.masa })),
+    isian: isian.map((j) => serialisasiJurnal(j, { hari: p.hari, masa: p.masa, libur: p.libur })),
   });
 });
 
@@ -55,7 +55,7 @@ export const POST = route<Ctx>(async (req, ctx) => {
   if (!parsed.success) return badRequest(parsed.error.flatten());
   const d = parsed.data;
 
-  if (!tanggalBolehIsi(p.hari, p.masa).includes(d.tanggal)) {
+  if (!tanggalBolehIsi(p.hari, p.masa, p.libur).includes(d.tanggal)) {
     return badRequest({ tanggal: ["Jurnal hanya bisa diisi untuk hari ini dan 2 hari sebelumnya."] });
   }
   const lama = await prisma.magangJurnal.findUnique({ where: { pesertaId_tanggal: { pesertaId: p.id, tanggal: atMidnight(d.tanggal) } } });
@@ -81,5 +81,5 @@ export const POST = route<Ctx>(async (req, ctx) => {
     throw e;
   }
   for (const f of dibuang) await hapusFoto(f);
-  return json(serialisasiJurnal(simpan, { hari: p.hari, masa: p.masa }), { status: lama ? 200 : 201 });
+  return json(serialisasiJurnal(simpan, { hari: p.hari, masa: p.masa, libur: p.libur }), { status: lama ? 200 : 201 });
 });

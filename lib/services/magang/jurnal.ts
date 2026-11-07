@@ -8,7 +8,7 @@ import { tambahHari } from "./rotasi";
 export const MIN_KEGIATAN = 20;
 export const MAKS_KEGIATAN = 3000;
 export const MAKS_FOTO = 3;
-/** Anak yang lupa boleh menyusulkan jurnal sampai 2 hari ke belakang. */
+/** Anak yang lupa boleh menyusulkan jurnal sampai 2 HARI KERJA ke belakang. */
 export const MUNDUR_HARI = 2;
 
 /** Hari dalam minggu dari "YYYY-MM-DD" (0 = Minggu), bebas zona waktu. */
@@ -17,21 +17,37 @@ export function hariDalamMinggu(ymd: string): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
-/** Tanggal yang boleh diisi hari ini: hari ini + MUNDUR_HARI ke belakang, dalam masa magang. */
-export function tanggalBolehIsi(hariIni: string, masa: { mulai: string; selesai: string | null }): string[] {
+/**
+ * Tanggal yang boleh diisi hari ini: hari kerja terakhir (hari ini bila hari kerja) + MUNDUR_HARI hari kerja
+ * ke belakang, dalam masa magang. Hari kerja = Senin–Sabtu tanpa libur nasional — sama dengan hitungan
+ * kerajinan di rapor. Dulu dihitung hari kalender, jadi hari Minggu bisa diisi (temuan simulasi 7 Nov 2026).
+ * "Hari ini" selalu dihitung satu jatah (walau libur), lalu MUNDUR_HARI hari kerja sebelumnya:
+ * Senin → Senin, Sabtu, Jumat; Minggu → Sabtu, Jumat.
+ */
+export function tanggalBolehIsi(hariIni: string, masa: { mulai: string; selesai: string | null }, libur: ReadonlySet<string> = new Set()): string[] {
   const hasil: string[] = [];
-  for (let k = 0; k <= MUNDUR_HARI; k++) {
+  const kerja = (t: string) => hariDalamMinggu(t) !== 0 && !libur.has(t);
+  let mundur = 0;
+  for (let k = 0; k <= 14 && mundur <= MUNDUR_HARI; k++) {
     const t = tambahHari(hariIni, -k);
     if (t < masa.mulai) break;
-    if (masa.selesai && t > masa.selesai) continue;
+    if (k > 0 && !kerja(t)) continue;
+    if (k > 0) mundur++;
+    if (mundur > MUNDUR_HARI) break;
+    if (!kerja(t) || (masa.selesai && t > masa.selesai)) continue;
     hasil.push(t);
   }
   return hasil;
 }
 
 /** Boleh disunting anak: tanggalnya masih dalam jendela isi DAN belum dicek pembimbing. */
-export function bolehSunting(j: { tanggal: string; dicek: boolean }, hariIni: string, masa: { mulai: string; selesai: string | null }): boolean {
-  return !j.dicek && tanggalBolehIsi(hariIni, masa).includes(j.tanggal);
+export function bolehSunting(
+  j: { tanggal: string; dicek: boolean },
+  hariIni: string,
+  masa: { mulai: string; selesai: string | null },
+  libur: ReadonlySet<string> = new Set()
+): boolean {
+  return !j.dicek && tanggalBolehIsi(hariIni, masa, libur).includes(j.tanggal);
 }
 
 /**

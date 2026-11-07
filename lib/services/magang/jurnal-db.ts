@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { toYmd } from "@/lib/services/leave/service";
+import { atMidnight } from "@/lib/services/leave/service";
 import { hariIni, keYmd, mingguTugas, penugasanPada, seninDari } from "./layanan";
+import { tambahHari } from "./rotasi";
 import { bolehSunting, daftarFoto, tanggalBolehIsi } from "./jurnal";
 
 /** Peserta aktif milik karyawan portal ini, dengan penugasan & tanggal tugas yang sudah dikirim. */
@@ -16,7 +18,11 @@ export async function pesertaPortal(employeeId: number) {
   // Tugas mengingat yang masih terbuka & belum dikirim → riwayat jurnal ditahan supaya tulisan
   // mingguannya tetap dari ingatan, bukan menyalin jurnal.
   const tugasTerbuka = mingguTugas(penugasan, new Set(p.tugas.map((t) => toYmd(t.senin))), hari).length > 0;
-  return { id: p.id, masa, penugasan, hari, tugasTerbuka };
+  // Libur nasional di sekitar hari ini → tidak ikut jendela isi jurnal (sama dengan hitungan rapor).
+  const libur = new Set(
+    (await prisma.holiday.findMany({ where: { date: { gte: atMidnight(tambahHari(hari, -14)), lte: atMidnight(hari) } }, select: { date: true } })).map((h) => toYmd(h.date))
+  );
+  return { id: p.id, masa, penugasan, hari, tugasTerbuka, libur };
 }
 
 export type PesertaPortal = NonNullable<Awaited<ReturnType<typeof pesertaPortal>>>;
@@ -27,7 +33,7 @@ export function posPada(p: PesertaPortal, tanggal: string): number | null {
 
 export function serialisasiJurnal(
   j: { id: number; tanggal: Date; kegiatan: string; kendala: string | null; foto: unknown; komentar: string | null; dicekAt: Date | null; pos?: { nama: string } | null },
-  ctx?: { hari: string; masa: { mulai: string; selesai: string | null } }
+  ctx?: { hari: string; masa: { mulai: string; selesai: string | null }; libur?: ReadonlySet<string> }
 ) {
   const tanggal = toYmd(j.tanggal);
   return {
@@ -40,7 +46,7 @@ export function serialisasiJurnal(
     komentar: j.komentar,
     dicek: !!j.dicekAt,
     dicekAt: j.dicekAt?.toISOString() ?? null,
-    bolehSunting: ctx ? bolehSunting({ tanggal, dicek: !!j.dicekAt }, ctx.hari, ctx.masa) : false,
+    bolehSunting: ctx ? bolehSunting({ tanggal, dicek: !!j.dicekAt }, ctx.hari, ctx.masa, ctx.libur) : false,
   };
 }
 
