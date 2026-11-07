@@ -87,7 +87,7 @@ function GrupAnak({ nama, items, onDicek, apiBase, q, bacaSaja, bukaAwal }: Umum
   return (
     <li className="glass rounded-2xl">
       <div className="flex flex-wrap items-center gap-3 p-4">
-        <button type="button" className="min-w-0 flex-1 text-left" aria-expanded={buka} onClick={() => setBuka(!buka)}>
+        <button type="button" className="w-full min-w-0 text-left sm:w-auto sm:flex-1" aria-expanded={buka} onClick={() => setBuka(!buka)}>
           <p className="font-semibold text-fg">
             <span aria-hidden className={`mr-1.5 inline-block text-muted transition-transform ${buka ? "rotate-90" : ""}`}>
               ›
@@ -102,7 +102,7 @@ function GrupAnak({ nama, items, onDicek, apiBase, q, bacaSaja, bukaAwal }: Umum
           </p>
         </button>
         {!bacaSaja && (
-          <button className="btn-ghost h-11 text-sm sm:h-9" disabled={busy} onClick={cekSemua}>
+          <button className="btn-ghost h-11 w-full text-sm sm:h-9 sm:w-auto" disabled={busy} onClick={cekSemua}>
             <IconCheck /> {busy ? "Menyimpan…" : `Tandai semua dicek (${items.length})`}
           </button>
         )}
