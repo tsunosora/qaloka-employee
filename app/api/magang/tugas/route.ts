@@ -21,15 +21,18 @@ export const GET = route(async (req: Request) => {
       peserta: { include: { employee: { select: { fullName: true, nickname: true } } } },
       pos: { select: { nama: true } },
       dinilaiOleh: { select: { name: true } },
+      dinilaiOlehKaryawan: { select: { fullName: true, nickname: true } },
     },
   });
   return json({
     items: items.map((t) => ({
       ...serialisasiTugas(t),
       pesertaId: t.pesertaId,
+      posId: t.posId,
       nama: t.peserta.employee.nickname || t.peserta.employee.fullName,
       pos: t.pos?.nama ?? "(pos dihapus)",
-      dinilaiOleh: t.dinilaiOleh?.name ?? null,
+      // Dinilai dari dasbor (akun) atau dari halaman pribadi pembimbing (karyawan).
+      dinilaiOleh: t.dinilaiOleh?.name ?? (t.dinilaiOlehKaryawan ? t.dinilaiOlehKaryawan.nickname || t.dinilaiOlehKaryawan.fullName : null),
     })),
     belumDinilai: await prisma.magangTugas.count({ where: { dinilaiAt: null } }),
   });

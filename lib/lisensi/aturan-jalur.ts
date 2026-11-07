@@ -74,6 +74,8 @@ export const ATURAN_API: readonly Aturan[] = [
   // tanpa kode fitur baru (paket Kinerja).
   { awalan: "/api/magang", fitur: "hr.assessment" },
   { awalan: "/api/public/portal/*/magang", fitur: "hr.assessment" },
+  // Pembimbing menilai/mengecek anak di posnya dari halaman pribadinya (8 Nov 2026).
+  { awalan: "/api/public/portal/*/bimbingan", fitur: "hr.assessment" },
   { awalan: "/api/public/daftar-magang", fitur: "hr.assessment" },
 
   { awalan: "/api/public/employee", fitur: "hr.guest_rating" },

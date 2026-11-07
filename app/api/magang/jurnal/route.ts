@@ -22,6 +22,7 @@ export const GET = route(async (req: Request) => {
       pos: { select: { nama: true } },
       peserta: { include: { employee: { select: { fullName: true, nickname: true } } } },
       dicekOleh: { select: { name: true } },
+      dicekOlehKaryawan: { select: { fullName: true, nickname: true } },
     },
   });
   return json({
@@ -30,7 +31,8 @@ export const GET = route(async (req: Request) => {
       pesertaId: j.pesertaId,
       posId: j.posId,
       nama: j.peserta.employee.nickname || j.peserta.employee.fullName,
-      dicekOleh: j.dicekOleh?.name ?? null,
+      // Dicek dari dasbor (akun) atau dari halaman pribadi pembimbing (karyawan).
+      dicekOleh: j.dicekOleh?.name ?? (j.dicekOlehKaryawan ? j.dicekOlehKaryawan.nickname || j.dicekOlehKaryawan.fullName : null),
     })),
     belumDicek: await prisma.magangJurnal.count({ where: { dicekAt: null } }),
   });

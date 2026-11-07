@@ -12,6 +12,7 @@ export type TugasAdmin = {
   senin: string;
   nama: string;
   pos: string;
+  posId?: number | null;
   ingatan: string;
   kuis: { soalId: number; pertanyaan: string; pilihan: string[]; benar: number; dipilih: number | null }[];
   skorKuis: number | null;
@@ -25,8 +26,22 @@ export type TugasAdmin = {
   dinilaiOleh?: string | null;
 };
 
-/** Modal menilai satu tugas mingguan: baca ingatan + hasil kuis, lalu isi rubrik. */
-export function NilaiTugas({ tugas, onClose, onSaved }: { tugas: TugasAdmin; onClose: () => void; onSaved: () => void }) {
+/**
+ * Modal menilai satu tugas mingguan: baca ingatan + hasil kuis, lalu isi rubrik.
+ * `apiBase` = awalan rute: dasbor `/api/magang` (login), halaman pribadi pembimbing
+ * `/api/public/portal/<token>/bimbingan` (PIN). Keduanya `PATCH <apiBase>/tugas/<id>`.
+ */
+export function NilaiTugas({
+  tugas,
+  onClose,
+  onSaved,
+  apiBase = "/api/magang",
+}: {
+  tugas: TugasAdmin;
+  onClose: () => void;
+  onSaved: () => void;
+  apiBase?: string;
+}) {
   const [ingatan, setIngatan] = useState<number | null>(tugas.nilaiIngatan);
   const [praktik, setPraktik] = useState<Record<AspekKey, number | null>>(tugas.praktik);
   const [catatan, setCatatan] = useState(tugas.catatanPembimbing ?? "");
@@ -41,7 +56,7 @@ export function NilaiTugas({ tugas, onClose, onSaved }: { tugas: TugasAdmin; onC
     setBusy(true);
     setGalat("");
     try {
-      await api(`/api/magang/tugas/${tugas.id}`, {
+      await api(`${apiBase}/tugas/${tugas.id}`, {
         method: "PATCH",
         body: JSON.stringify({ nilaiIngatan: ingatan, ...praktik, catatanPembimbing: catatan || null }),
       });
@@ -132,10 +147,10 @@ export function NilaiTugas({ tugas, onClose, onSaved }: { tugas: TugasAdmin; onC
             {!lengkap && <span className="ml-1 text-xs">(isi semua rubrik)</span>}
           </p>
           <div className="flex gap-2">
-            <button onClick={onClose} className="btn-ghost h-10 text-sm">
+            <button onClick={onClose} className="btn-ghost h-11 text-sm sm:h-10">
               Batal
             </button>
-            <button onClick={simpan} disabled={!lengkap || busy} className="btn-primary h-10 text-sm">
+            <button onClick={simpan} disabled={!lengkap || busy} className="btn-primary h-11 text-sm sm:h-10">
               {busy ? "Menyimpan…" : "Simpan nilai"}
             </button>
           </div>

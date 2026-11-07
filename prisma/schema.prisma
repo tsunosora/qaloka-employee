@@ -194,6 +194,8 @@ model Employee {
   pembayaranUpah       PembayaranUpah[]       @relation("PembayaranKaryawan")
   magangPeserta        MagangPeserta?
   magangDibimbing      MagangPos[]            @relation("MagangPembimbing")
+  magangDinilai        MagangTugas[]          @relation("MagangPenilaiKaryawan")
+  magangJurnalDicek    MagangJurnal[]         @relation("MagangJurnalCekKaryawan")
 
   @@index([isActive])
 }
@@ -1073,59 +1075,67 @@ model MagangPenugasan {
 // dikerjakan + jawabannya (riwayat tidak berubah bila bank soal disunting). Kolom nilai praktik
 // (1–4) = ASPEK_PRAKTIK di lib/services/magang/nilai.ts.
 model MagangTugas {
-  id                Int       @id @default(autoincrement())
-  pesertaId         Int
-  senin             DateTime
-  posId             Int?
-  ingatan           String    @db.Text
-  jawabanKuis       Json
-  skorKuis          Int?
-  terlambat         Boolean   @default(false)
-  dikirimAt         DateTime  @default(now())
-  nilaiIngatan      Int?
-  ketelitian        Int?
-  kecepatan         Int?
-  inisiatif         Int?
-  sikap             Int?
-  nilai             Int?
-  catatanPembimbing String?   @db.Text
-  dinilaiOlehId     Int?
-  dinilaiAt         DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                    Int       @id @default(autoincrement())
+  pesertaId             Int
+  senin                 DateTime
+  posId                 Int?
+  ingatan               String    @db.Text
+  jawabanKuis           Json
+  skorKuis              Int?
+  terlambat             Boolean   @default(false)
+  dikirimAt             DateTime  @default(now())
+  nilaiIngatan          Int?
+  ketelitian            Int?
+  kecepatan             Int?
+  inisiatif             Int?
+  sikap                 Int?
+  nilai                 Int?
+  catatanPembimbing     String?   @db.Text
+  dinilaiOlehId         Int?
+  // Dinilai pembimbing dari halaman pribadinya (/me/<token>, 8 Nov 2026) — bukan akun dashboard.
+  dinilaiOlehKaryawanId Int?
+  dinilaiAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  peserta     MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
-  pos         MagangPos?    @relation(fields: [posId], references: [id], onDelete: SetNull)
-  dinilaiOleh User?         @relation("MagangPenilai", fields: [dinilaiOlehId], references: [id], onDelete: SetNull)
+  peserta             MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+  pos                 MagangPos?    @relation(fields: [posId], references: [id], onDelete: SetNull)
+  dinilaiOleh         User?         @relation("MagangPenilai", fields: [dinilaiOlehId], references: [id], onDelete: SetNull)
+  dinilaiOlehKaryawan Employee?     @relation("MagangPenilaiKaryawan", fields: [dinilaiOlehKaryawanId], references: [id], onDelete: SetNull)
 
   @@unique([pesertaId, senin])
   @@index([posId])
   @@index([dinilaiAt])
+  @@index([dinilaiOlehKaryawanId])
 }
 
 // Jurnal harian anak magang (7 Nov 2026): apa yang dikerjakan hari itu + foto (maks 3, path di
 // storage/magang) + kendala. Satu baris per anak per tanggal; anak boleh menyunting sampai dicek
 // pembimbing. Rapor hanya memakai kelengkapannya (kerajinan), bukan nilainya.
 model MagangJurnal {
-  id          Int       @id @default(autoincrement())
-  pesertaId   Int
-  tanggal     DateTime
-  posId       Int?
-  kegiatan    String    @db.Text
-  kendala     String?   @db.Text
-  foto        Json
-  komentar    String?   @db.Text
-  dicekAt     DateTime?
-  dicekOlehId Int?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                  Int       @id @default(autoincrement())
+  pesertaId           Int
+  tanggal             DateTime
+  posId               Int?
+  kegiatan            String    @db.Text
+  kendala             String?   @db.Text
+  foto                Json
+  komentar            String?   @db.Text
+  dicekAt             DateTime?
+  dicekOlehId         Int?
+  // Dicek pembimbing dari halaman pribadinya (/me/<token>, 8 Nov 2026) — bukan akun dashboard.
+  dicekOlehKaryawanId Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  peserta   MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
-  pos       MagangPos?    @relation(fields: [posId], references: [id], onDelete: SetNull)
-  dicekOleh User?         @relation("MagangJurnalCek", fields: [dicekOlehId], references: [id], onDelete: SetNull)
+  peserta           MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+  pos               MagangPos?    @relation(fields: [posId], references: [id], onDelete: SetNull)
+  dicekOleh         User?         @relation("MagangJurnalCek", fields: [dicekOlehId], references: [id], onDelete: SetNull)
+  dicekOlehKaryawan Employee?     @relation("MagangJurnalCekKaryawan", fields: [dicekOlehKaryawanId], references: [id], onDelete: SetNull)
 
   @@unique([pesertaId, tanggal])
   @@index([dicekAt])
+  @@index([dicekOlehKaryawanId])
 }
 
 // Tautan pendaftaran mandiri. Anak yang mendaftar masuk MagangPendaftar (BUKAN Employee) sampai
@@ -1146,22 +1156,22 @@ model MagangDaftar {
 // token = publicToken karyawan nanti (tautan HP yang dipegang anak tidak berubah sesudah
 // disetujui). pinHash = PIN portal yang dibuat anak saat mendaftar (bcrypt).
 model MagangPendaftar {
-  id           Int       @id @default(autoincrement())
-  daftarId     Int
-  token        String    @unique @db.VarChar(36)
-  namaLengkap  String    @db.VarChar(150)
-  panggilan    String?   @db.VarChar(50)
-  hp           String?   @db.VarChar(30)
-  sekolah      String?   @db.VarChar(150)
-  jurusan      String?   @db.VarChar(100)
-  mulai        DateTime
-  selesai      DateTime?
-  pinHash      String    @db.VarChar(100)
-  status       String    @default("menunggu") @db.VarChar(20) // menunggu | disetujui | ditolak
-  alasanTolak  String?   @db.VarChar(255)
-  employeeId   Int?
-  diputusAt    DateTime?
-  createdAt    DateTime  @default(now())
+  id          Int       @id @default(autoincrement())
+  daftarId    Int
+  token       String    @unique @db.VarChar(36)
+  namaLengkap String    @db.VarChar(150)
+  panggilan   String?   @db.VarChar(50)
+  hp          String?   @db.VarChar(30)
+  sekolah     String?   @db.VarChar(150)
+  jurusan     String?   @db.VarChar(100)
+  mulai       DateTime
+  selesai     DateTime?
+  pinHash     String    @db.VarChar(100)
+  status      String    @default("menunggu") @db.VarChar(20) // menunggu | disetujui | ditolak
+  alasanTolak String?   @db.VarChar(255)
+  employeeId  Int?
+  diputusAt   DateTime?
+  createdAt   DateTime  @default(now())
 
   daftar MagangDaftar @relation(fields: [daftarId], references: [id], onDelete: Cascade)
 

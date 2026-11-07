@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
 import { nilaiTugasSchema } from "@/lib/validators/magang";
-import { hitungNilai } from "@/lib/services/magang/layanan";
+import { dataPenilaian } from "@/lib/services/magang/layanan";
 import { idPengguna } from "@/lib/services/reimbursement/service";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -14,11 +14,10 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   if (!parsed.success) return badRequest(parsed.error.flatten());
   const t = await prisma.magangTugas.findUnique({ where: { id } });
   if (!t) return notFound("Tugas tidak ditemukan.");
-  const d = parsed.data;
-  const nilai = hitungNilai({ skorKuis: t.skorKuis, ...d });
+  const data = dataPenilaian(t.skorKuis, parsed.data);
   await prisma.magangTugas.update({
     where: { id },
-    data: { ...d, nilai, dinilaiAt: new Date(), dinilaiOlehId: await idPengguna(session.user?.email) },
+    data: { ...data, dinilaiOlehId: await idPengguna(session.user?.email), dinilaiOlehKaryawanId: null },
   });
-  return json({ ok: true, nilai });
+  return json({ ok: true, nilai: data.nilai });
 });

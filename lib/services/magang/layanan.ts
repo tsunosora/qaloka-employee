@@ -125,6 +125,17 @@ export function hitungNilai(t: {
 }
 
 /**
+ * Kolom yang disimpan saat pembimbing menilai satu tugas (dasbor maupun halaman pribadi pembimbing):
+ * isian rubrik + nilai yang dihitung ulang di server + waktu dinilai. Siapa penilainya ditambah pemanggil.
+ */
+export function dataPenilaian(
+  skorKuis: number | null,
+  d: { nilaiIngatan: number; ketelitian: number; kecepatan: number; inisiatif: number; sikap: number; catatanPembimbing: string | null }
+) {
+  return { ...d, nilai: hitungNilai({ skorKuis, ...d }), dinilaiAt: new Date() };
+}
+
+/**
  * Minggu-minggu yang tugasnya bisa/harus diisi anak hari ini: minggu ini (bila sudah Jumat) dan
  * minggu-minggu lalu dalam masa magangnya yang belum diisi (terlambat). Paling lama dulu.
  */

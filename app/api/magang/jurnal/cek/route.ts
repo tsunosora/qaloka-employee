@@ -13,7 +13,7 @@ export const POST = route(async (req: Request) => {
   if (!parsed.success) return badRequest(parsed.error.flatten());
   const r = await prisma.magangJurnal.updateMany({
     where: { id: { in: parsed.data.ids }, dicekAt: null },
-    data: { komentar: parsed.data.komentar, dicekAt: new Date(), dicekOlehId: await idPengguna(session.user?.email) },
+    data: { komentar: parsed.data.komentar, dicekAt: new Date(), dicekOlehId: await idPengguna(session.user?.email), dicekOlehKaryawanId: null },
   });
   return json({ jumlah: r.count });
 });

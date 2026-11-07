@@ -21,14 +21,17 @@ import { ReimbursementPanel } from "@/components/portal/ReimbursementPanel";
 import { KunjunganPanel } from "@/components/portal/KunjunganPanel";
 import { TimesheetPanel } from "@/components/portal/TimesheetPanel";
 import { MagangPanel } from "@/components/portal/MagangPanel";
+import { BimbinganPanel } from "@/components/portal/BimbinganPanel";
 import { soft } from "@/components/portal/ui";
 import type { Overview, PortalState } from "@/components/portal/types";
 
 // `fitur` = kode lisensi yang harus ada supaya tab tampil (lib/services/portal/keadaan.ts).
 // `bulanan` = tab memakai pemilih bulan di atas; yang tidak punya rentangnya sendiri.
 // `magang` = hanya tampil untuk peserta magang aktif (state.magang).
-const TABS: readonly { key: string; label: string; fitur?: string; bulanan?: boolean; magang?: boolean }[] = [
+// `pembimbing` = hanya tampil untuk pembimbing pos magang aktif (state.pembimbing).
+const TABS: readonly { key: string; label: string; fitur?: string; bulanan?: boolean; magang?: boolean; pembimbing?: boolean }[] = [
   { key: "magang", label: "Magang", fitur: "hr.assessment", magang: true },
+  { key: "bimbingan", label: "Bimbingan", fitur: "hr.assessment", pembimbing: true },
   { key: "overview", label: "Ringkasan", bulanan: true },
   { key: "attendance", label: "Absensi", bulanan: true },
   { key: "assessment", label: "Penilaian", bulanan: true },
@@ -207,7 +210,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
         <div className="flex flex-wrap items-center gap-2">
           {/* Tab di barisnya sendiri: kalau berbagi baris dengan pemilih bulan, di HP cuma satu tab yang terlihat. */}
           <nav ref={deretTab} className="glass flex w-full gap-1 overflow-x-auto rounded-2xl p-1">
-            {TABS.filter((t) => (!t.fitur || state.fitur?.[t.fitur] !== false) && (!t.magang || state.magang)).map((t) => (
+            {TABS.filter((t) => (!t.fitur || state.fitur?.[t.fitur] !== false) && (!t.magang || state.magang) && (!t.pembimbing || state.pembimbing)).map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
@@ -254,6 +257,8 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
 
         {tab === "magang" && state.magang ? (
           <MagangPanel token={token} ownerQuery={ownerQuery} />
+        ) : tab === "bimbingan" && state.pembimbing ? (
+          <BimbinganPanel token={token} ownerQuery={ownerQuery} />
         ) : tab === "leave" ? (
           <LeavePanel token={token} ownerQuery={ownerQuery} />
         ) : tab === "lembur" ? (

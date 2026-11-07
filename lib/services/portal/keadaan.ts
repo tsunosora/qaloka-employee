@@ -25,6 +25,8 @@ export async function keadaanPortal(req: Request, token: string): Promise<{
     fitur: Record<string, boolean>;
     /** Karyawan ini peserta magang aktif → tab Magang tampil. */
     magang: boolean;
+    /** Karyawan ini pembimbing ≥1 pos magang aktif → tab Bimbingan tampil. */
+    pembimbing: boolean;
   };
 }> {
   const employee = await requireEmployeeByToken(token);
@@ -55,6 +57,7 @@ export async function keadaanPortal(req: Request, token: string): Promise<{
       authenticated: session?.employeeId === employee.id || asManager,
       fitur: await fiturTampil(FITUR_TAB_PORTAL),
       magang: (await prisma.magangPeserta.count({ where: { employeeId: employee.id, aktif: true } })) > 0,
+      pembimbing: (await prisma.magangPos.count({ where: { pembimbingId: employee.id, aktif: true, deletedAt: null } })) > 0,
     },
   };
 }

@@ -14,7 +14,7 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   if (!(await prisma.magangJurnal.findUnique({ where: { id }, select: { id: true } }))) return notFound("Jurnal tidak ditemukan.");
   await prisma.magangJurnal.update({
     where: { id },
-    data: { komentar: parsed.data.komentar, dicekAt: new Date(), dicekOlehId: await idPengguna(session.user?.email) },
+    data: { komentar: parsed.data.komentar, dicekAt: new Date(), dicekOlehId: await idPengguna(session.user?.email), dicekOlehKaryawanId: null },
   });
   return json({ ok: true });
 });

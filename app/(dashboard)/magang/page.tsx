@@ -33,6 +33,8 @@ export default function MagangPage() {
   const [dinilai, setDinilai] = useState<TugasAdmin | null>(null);
 
   const [jurnal, setJurnal] = useState<JurnalAdmin[] | null>(null);
+  // Saring "Perlu dinilai" & jurnal per pos (0 = semua pos) — tiap pembimbing cukup melihat posnya.
+  const [filterPos, setFilterPos] = useState(0);
 
   const ambil = useCallback(
     () =>
@@ -70,6 +72,15 @@ export default function MagangPage() {
       ]
     : [];
   const siap = langkah.every((l) => l.selesai);
+
+  // Pilihan pos = pos yang punya tugas/jurnal menunggu. Pos terpilih yang sudah habis antreannya → semua pos.
+  const pilihanPos = new Map<number, string>();
+  for (const t of tugas ?? []) if (t.posId != null) pilihanPos.set(t.posId, t.pos);
+  for (const j of jurnal ?? []) if (j.posId != null && !pilihanPos.has(j.posId)) pilihanPos.set(j.posId, j.pos ?? "(pos dihapus)");
+  const posAktif = pilihanPos.has(filterPos) ? filterPos : 0;
+  const cocokPos = (posId: number | null | undefined) => posAktif === 0 || posId === posAktif;
+  const tugasTampil = tugas?.filter((t) => cocokPos(t.posId)) ?? null;
+  const jurnalTampil = jurnal?.filter((j) => cocokPos(j.posId)) ?? null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -177,17 +188,31 @@ export default function MagangPage() {
             </section>
           )}
 
+          {pilihanPos.size > 1 && (
+            <label className="flex items-center gap-2 text-sm text-muted">
+              Pos
+              <select className="input h-9 w-auto text-sm" value={posAktif} onChange={(e) => setFilterPos(Number(e.target.value))}>
+                <option value={0}>Semua pos</option>
+                {[...pilihanPos].map(([id, nama]) => (
+                  <option key={id} value={id}>
+                    {nama}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <section>
             <h2 className="mb-2 text-sm font-bold text-fg">
-              Perlu dinilai {tugas && tugas.length > 0 && <span className="text-warning">({tugas.length})</span>}
+              Perlu dinilai {tugasTampil && tugasTampil.length > 0 && <span className="text-warning">({tugasTampil.length})</span>}
             </h2>
-            {!tugas ? (
+            {!tugasTampil ? (
               <Memuat baris={2} tinggi="h-16" />
-            ) : tugas.length === 0 ? (
-              <Kosong>Semua tugas yang masuk sudah dinilai.</Kosong>
+            ) : tugasTampil.length === 0 ? (
+              <Kosong>{posAktif ? "Semua tugas di pos ini sudah dinilai." : "Semua tugas yang masuk sudah dinilai."}</Kosong>
             ) : (
               <ul className="space-y-2">
-                {tugas.map((t) => (
+                {tugasTampil.map((t) => (
                   <li key={t.id} className="glass flex flex-wrap items-center gap-3 rounded-2xl p-4">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-fg">
@@ -210,15 +235,15 @@ export default function MagangPage() {
 
           <section>
             <h2 className="mb-2 text-sm font-bold text-fg">
-              Jurnal harian belum dicek {jurnal && jurnal.length > 0 && <span className="text-warning">({jurnal.length})</span>}
+              Jurnal harian belum dicek {jurnalTampil && jurnalTampil.length > 0 && <span className="text-warning">({jurnalTampil.length})</span>}
             </h2>
-            {!jurnal ? (
+            {!jurnalTampil ? (
               <Memuat baris={2} tinggi="h-16" />
-            ) : jurnal.length === 0 ? (
-              <Kosong>Semua jurnal yang masuk sudah dicek.</Kosong>
+            ) : jurnalTampil.length === 0 ? (
+              <Kosong>{posAktif ? "Semua jurnal di pos ini sudah dicek." : "Semua jurnal yang masuk sudah dicek."}</Kosong>
             ) : (
               <DaftarJurnalPerAnak
-                items={jurnal}
+                items={jurnalTampil}
                 onDicek={(nama) => {
                   setNotice(`Jurnal ${nama} ditandai sudah dicek.`);
                   muat();
