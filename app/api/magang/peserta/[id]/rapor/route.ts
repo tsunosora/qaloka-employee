@@ -6,6 +6,7 @@ import { serialisasiJurnal } from "@/lib/services/magang/jurnal-db";
 import { hariIni, keYmd, serialisasiTugas } from "@/lib/services/magang/layanan";
 import { seninDari } from "@/lib/services/magang/rotasi";
 import { susunRapor } from "@/lib/services/magang/rapor";
+import { namaUsaha } from "@/lib/services/upah/data";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -50,6 +51,8 @@ export const GET = route<Ctx>(async (_req, ctx) => {
   const jurnal = kerajinan(jurnalBaris.map((j) => toYmd(j.tanggal)), hariKerjaList);
 
   return json({
+    // Kop rapor (rapor dipakai untuk sekolah & melamar kerja → tempat magangnya harus tertulis).
+    usaha: await namaUsaha(),
     jurnal,
     daftarJurnal: jurnalBaris.map((j) => ({
       ...serialisasiJurnal(j),

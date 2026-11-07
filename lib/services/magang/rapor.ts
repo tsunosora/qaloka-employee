@@ -29,6 +29,11 @@ export type BarisRapor = {
 
 const rata = (xs: number[]) => (xs.length ? Math.round((xs.reduce((s, n) => s + n, 0) / xs.length) * 10) / 10 : null);
 
+/** Angka rapor gaya Indonesia: 40.5 → "40,5", 3 → "3", null → "—" (dulu tampil "40.5"). */
+export function angkaId(n: number | null | undefined): string {
+  return n == null ? "—" : n.toLocaleString("id-ID", { maximumFractionDigits: 1 });
+}
+
 export function susunRapor(input: {
   penugasan: readonly Penugasan[];
   tugas: readonly Tugas[];

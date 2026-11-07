@@ -6,6 +6,7 @@ import { api } from "@/lib/fetcher";
 import { IconChevronLeft, IconDownload } from "@/components/ui/icons";
 import { longDate } from "@/components/portal/ui";
 import { ASPEK_PRAKTIK, SKALA, type AspekKey } from "@/lib/services/magang/nilai";
+import { angkaId } from "@/lib/services/magang/rapor";
 import { NilaiTugas, type TugasAdmin } from "@/components/magang/NilaiTugas";
 import { DaftarJurnal, type JurnalAdmin } from "@/components/magang/DaftarJurnal";
 import { Memuat, Pesan, tglPendek, warnaNilai } from "@/components/magang/ui";
@@ -38,6 +39,7 @@ type Payload = {
   tugas: Omit<TugasAdmin, "nama">[];
   jurnal: { terisi: number; dari: number; persen: number | null };
   daftarJurnal: JurnalAdmin[];
+  usaha: string | null;
 };
 
 /** 3.4 → "Bisa sendiri" (label skala terdekat ke bawah). */
@@ -45,6 +47,12 @@ function labelSkala(n: number | null): string {
   if (n == null) return "—";
   const s = [...SKALA].reverse().find((x) => n >= x.nilai - 0.25) ?? SKALA[0];
   return s.label;
+}
+
+/** Tanggal hari ini (zona lokal browser) "YYYY-MM-DD" untuk tanggal tanda tangan. */
+function hariIniLokal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** Baris target "- poin" → daftar poin tanpa tanda. */
@@ -93,7 +101,7 @@ export default function RaporMagangPage({ params }: { params: Promise<{ id: stri
       <article className="glass space-y-6 rounded-2xl p-6 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Rapor magang</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Rapor magang{data.usaha ? ` · ${data.usaha}` : ""}</p>
             <h1 className="font-display text-2xl font-bold text-fg">{p.nama}</h1>
             <p className="text-sm text-muted">{[p.sekolah, p.jurusan].filter(Boolean).join(" · ")}</p>
             <p className="text-sm text-muted">
@@ -106,7 +114,7 @@ export default function RaporMagangPage({ params }: { params: Promise<{ id: stri
             </p>
             <p className="text-sm font-semibold text-fg">{r.predikat}</p>
             <p className="text-xs text-muted">
-              Kuis rata-rata {r.rataKuis ?? "—"} · {r.tugasDikirim} tugas{r.tugasTerlambat ? `, ${r.tugasTerlambat} terlambat` : ""}
+              Kuis rata-rata {angkaId(r.rataKuis)} · {r.tugasDikirim} tugas{r.tugasTerlambat ? `, ${r.tugasTerlambat} terlambat` : ""}
             </p>
             <p className="text-xs text-muted">
               Jurnal harian terisi <b className="text-fg">{data.jurnal.terisi}</b> dari {data.jurnal.dari} hari kerja
@@ -121,7 +129,7 @@ export default function RaporMagangPage({ params }: { params: Promise<{ id: stri
             {ASPEK_PRAKTIK.map((a) => (
               <div key={a.key} className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted">{a.label}</p>
-                <p className="font-display text-lg font-bold text-fg">{r.praktik[a.key] ?? "—"}<span className="text-xs font-normal text-subtle"> / 4</span></p>
+                <p className="font-display text-lg font-bold text-fg">{angkaId(r.praktik[a.key])}<span className="text-xs font-normal text-subtle"> / 4</span></p>
                 <p className="text-xs text-muted">{labelSkala(r.praktik[a.key])}</p>
               </div>
             ))}
@@ -190,6 +198,20 @@ export default function RaporMagangPage({ params }: { params: Promise<{ id: stri
               ))}
             </ul>
           )}
+        </section>
+
+        {/* Kolom tanda tangan — rapor diserahkan ke sekolah & dipakai melamar kerja. */}
+        <section className="break-inside-avoid border-t border-border pt-5">
+          <p className="text-right text-sm text-muted">{longDate(hariIniLokal())}</p>
+          <div className="mt-2 grid grid-cols-2 gap-8 text-center text-sm text-fg">
+            {["Pembimbing", data.usaha ? `Pimpinan ${data.usaha}` : "Pimpinan"].map((jabatan) => (
+              <div key={jabatan}>
+                <p>{jabatan}</p>
+                <div className="mx-auto mt-16 w-48 border-b border-border-strong" />
+                <p className="mt-1 text-xs text-muted">nama &amp; tanda tangan</p>
+              </div>
+            ))}
+          </div>
         </section>
       </article>
 
