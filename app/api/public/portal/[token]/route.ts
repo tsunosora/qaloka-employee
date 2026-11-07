@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { json, route } from "@/lib/http";
 import { keadaanPortal } from "@/lib/services/portal/keadaan";
-import { tolakMenunggu } from "@/lib/services/magang/pendaftaran";
+import { pesanDitolak, tolakMenunggu } from "@/lib/services/magang/pendaftaran";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -24,7 +24,7 @@ export const GET = route<Ctx>(async (req, ctx) => {
       if (p?.status === "menunggu") return tolakMenunggu();
       if (p?.status === "ditolak") {
         return NextResponse.json(
-          { message: `Pendaftaran magangmu tidak disetujui${p.alasanTolak ? `: ${p.alasanTolak}` : "."} Hubungi pengawas.` },
+          { message: pesanDitolak(p.alasanTolak) },
           { status: 404 }
         );
       }

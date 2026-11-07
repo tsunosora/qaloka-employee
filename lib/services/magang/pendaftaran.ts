@@ -69,6 +69,16 @@ export async function buatPesertaBaru(
   return { employee, peserta };
 }
 
+/**
+ * Pesan untuk pendaftar yang ditolak. Alasan diketik bebas oleh pengawas (sering tanpa titik), jadi
+ * diberi tanda akhir sebelum kalimat "Hubungi pengawas." — dulu tersambung: "…penuh Hubungi pengawas."
+ */
+export function pesanDitolak(alasan: string | null | undefined): string {
+  const a = (alasan ?? "").trim();
+  if (!a) return "Pendaftaran magangmu tidak disetujui. Hubungi pengawas.";
+  return `Pendaftaran magangmu tidak disetujui: ${/[.!?…]$/.test(a) ? a : `${a}.`} Hubungi pengawas.`;
+}
+
 export function tolakMenunggu(): Response {
   return NextResponse.json(
     { message: "Pendaftaran magangmu masih menunggu persetujuan pengawas. Buka lagi tautan ini setelah disetujui.", code: "MAGANG_MENUNGGU" },
