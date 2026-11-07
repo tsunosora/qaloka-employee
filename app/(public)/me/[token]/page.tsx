@@ -10,6 +10,7 @@ import {
   IconSettings,
 } from "@/components/ui/icons";
 import { PinGate } from "@/components/portal/PinGate";
+import { TABS_PORTAL as TABS, tabTampil, subjudulPortal } from "@/lib/services/portal/tab-portal";
 import { OverviewPanel } from "@/components/portal/OverviewPanel";
 import { AttendancePanel } from "@/components/portal/AttendancePanel";
 import { AssessmentPanel } from "@/components/portal/AssessmentPanel";
@@ -25,23 +26,6 @@ import { BimbinganPanel } from "@/components/portal/BimbinganPanel";
 import { soft } from "@/components/portal/ui";
 import type { Overview, PortalState } from "@/components/portal/types";
 
-// `fitur` = kode lisensi yang harus ada supaya tab tampil (lib/services/portal/keadaan.ts).
-// `bulanan` = tab memakai pemilih bulan di atas; yang tidak punya rentangnya sendiri.
-// `magang` = hanya tampil untuk peserta magang aktif (state.magang).
-// `pembimbing` = hanya tampil untuk pembimbing pos magang aktif (state.pembimbing).
-const TABS: readonly { key: string; label: string; fitur?: string; bulanan?: boolean; magang?: boolean; pembimbing?: boolean }[] = [
-  { key: "magang", label: "Magang", fitur: "hr.assessment", magang: true },
-  { key: "bimbingan", label: "Bimbingan", fitur: "hr.assessment", pembimbing: true },
-  { key: "overview", label: "Ringkasan", bulanan: true },
-  { key: "attendance", label: "Absensi", bulanan: true },
-  { key: "assessment", label: "Penilaian", bulanan: true },
-  { key: "points", label: "Poin", bulanan: true },
-  { key: "leave", label: "Izin" },
-  { key: "lembur", label: "Lembur", fitur: "hr.overtime" },
-  { key: "kunjungan", label: "Kunjungan", fitur: "hr.visits" },
-  { key: "reimbursement", label: "Klaim", fitur: "hr.reimbursement" },
-  { key: "timesheet", label: "Timesheet", fitur: "hr.timesheet" },
-];
 type TabKey = string;
 
 function currentMonth(): { year: number; month: number } {
@@ -150,6 +134,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
           employee={state.employee}
           pinSet={state.pinSet}
           posproPin={state.posproPin}
+          magang={state.magang}
           onSuccess={() => setState({ ...state, authenticated: true })}
         />
       </Centered>
@@ -170,8 +155,9 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
               {state.employee.fullName}
             </h1>
             <p className="truncate text-xs text-muted">
-              {[state.employee.position, state.employee.department].filter(Boolean).join(" · ") ||
-                "Karyawan"}
+              {state.magang
+                ? subjudulPortal({ magang: true, position: null, department: null })
+                : [state.employee.position, state.employee.department].filter(Boolean).join(" · ") || "Karyawan"}
             </p>
           </div>
           {!state.asManager && (
@@ -210,7 +196,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
         <div className="flex flex-wrap items-center gap-2">
           {/* Tab di barisnya sendiri: kalau berbagi baris dengan pemilih bulan, di HP cuma satu tab yang terlihat. */}
           <nav ref={deretTab} className="glass flex w-full gap-1 overflow-x-auto rounded-2xl p-1">
-            {TABS.filter((t) => (!t.fitur || state.fitur?.[t.fitur] !== false) && (!t.magang || state.magang) && (!t.pembimbing || state.pembimbing)).map((t) => (
+            {TABS.filter((t) => tabTampil(t, state)).map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
