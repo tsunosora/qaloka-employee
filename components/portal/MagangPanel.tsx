@@ -6,6 +6,7 @@ import { IconAlert, IconCheck, IconX } from "@/components/ui/icons";
 import { Card, longDate, soft } from "@/components/portal/ui";
 import { tglPendek, warnaNilai } from "@/components/magang/ui";
 import { JurnalMagang } from "@/components/portal/JurnalMagang";
+import { hitungBenar, predikat } from "@/lib/services/magang/nilai";
 
 type Soal = { id: number; pertanyaan: string; pilihan: string[] };
 type Terbuka = { senin: string; buka: string; batas: string; keadaan: "buka" | "terlambat"; pos: string; mingguKe: number; dari: number; soal: Soal[] };
@@ -139,16 +140,25 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
                       {r.pos} · minggu {tglPendek(r.senin)}
                     </p>
                     <p className="text-xs text-muted">
-                      Kuis {r.skorKuis ?? "—"}
+                      {r.kuis.length > 0
+                        ? `Kuis ${hitungBenar(r.kuis).benar} dari ${hitungBenar(r.kuis).dari} benar`
+                        : "Tanpa kuis"}
                       {r.terlambat && <span className="text-danger"> · dikirim terlambat</span>}
                     </p>
                   </div>
-                  <p className="font-display text-xl font-bold" style={{ color: warnaNilai(r.nilai) }}>
-                    {r.nilai ?? <span className="text-xs font-normal text-muted">belum dinilai</span>}
-                  </p>
+                  <div className="shrink-0 text-right">
+                    <p className="font-display text-xl font-bold leading-tight" style={{ color: warnaNilai(r.nilai) }}>
+                      {r.nilai ?? <span className="text-xs font-normal text-muted">belum dinilai</span>}
+                    </p>
+                    {r.nilai != null && <p className="text-xs font-semibold text-muted">{predikat(r.nilai)}</p>}
+                  </div>
                 </div>
                 {r.dinilaiAt && (
                   <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs sm:grid-cols-4">
+                    <div>
+                      <dt className="text-muted">Isi tulisanmu</dt>
+                      <dd className="font-semibold text-fg">{data.skala.find((s) => s.nilai === r.nilaiIngatan)?.label ?? "—"}</dd>
+                    </div>
                     {data.aspek.map((a) => (
                       <div key={a.key}>
                         <dt className="text-muted">{a.label}</dt>

@@ -114,6 +114,11 @@ export function nilaiMinggu(t: {
   return Math.round(total);
 }
 
+/** Jumlah jawaban kuis yang benar — untuk "Kuis 2 dari 5 benar" di HP anak (dulu hanya "Kuis 40"). */
+export function hitungBenar(kuis: readonly { benar: number; dipilih: number | null }[]): { benar: number; dari: number } {
+  return { benar: kuis.filter((k) => k.dipilih === k.benar).length, dari: kuis.length };
+}
+
 export function predikat(nilai: number | null): string {
   if (nilai == null) return "Belum dinilai";
   if (nilai >= 85) return "Sangat baik";
