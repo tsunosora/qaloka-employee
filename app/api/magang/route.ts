@@ -24,7 +24,7 @@ export const GET = route(async () => {
       },
     }),
     prisma.magangPos.findMany({ select: { id: true, nama: true, pembimbing: { select: { fullName: true } } } }),
-    prisma.magangTugas.count({ where: { dinilaiAt: null } }),
+    prisma.magangTugas.count({ where: { dinilaiAt: null, peserta: { aktif: true, employee: { deletedAt: null } } } }),
     prisma.magangPos.count({ where: { aktif: true, deletedAt: null } }),
   ]);
   const posMap = new Map(pos.map((p) => [p.id, p]));

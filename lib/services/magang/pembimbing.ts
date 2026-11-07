@@ -12,6 +12,19 @@ export function posMilik(pos: readonly PosBimbingan[], employeeId: number): numb
   return pos.filter((p) => p.pembimbingId === employeeId && p.aktif && !p.deletedAt).map((p) => p.id);
 }
 
+/** Nama yang menilai/mengecek: akun dasbor, atau karyawan (pembimbing lewat halaman pribadinya). */
+export function namaPengurus(akun: { name: string | null } | null | undefined, karyawan: { fullName: string; nickname: string | null } | null | undefined): string | null {
+  return akun?.name ?? (karyawan ? karyawan.nickname || karyawan.fullName : null);
+}
+
+/**
+ * Daftar "belum dinilai / belum dicek" di Minggu Ini hanya untuk peserta yang MASIH magang — dulu peserta
+ * yang sudah dinonaktifkan tetap menumpuk di sana. Bila dibuka per anak (rapor), semua tampil.
+ */
+export function saringPesertaAktif(status: string, pesertaId: number | null): { aktif?: true } {
+  return status === "belum" && !pesertaId ? { aktif: true } : {};
+}
+
 /** Boleh mengurus (menilai/mengecek/melihat foto) baris dengan posId ini? Tanpa pos = tidak. */
 export function bolehUrus(posId: number | null | undefined, posIds: readonly number[]): boolean {
   return posId != null && posIds.includes(posId);

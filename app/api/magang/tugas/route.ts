@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { namaPengurus, saringPesertaAktif } from "@/lib/services/magang/pembimbing";
 import { requireManager, json, route } from "@/lib/http";
 import { serialisasiTugas } from "@/lib/services/magang/layanan";
 
@@ -12,6 +13,7 @@ export const GET = route(async (req: Request) => {
   const where: Prisma.MagangTugasWhereInput = {
     ...(status === "belum" ? { dinilaiAt: null } : {}),
     ...(pesertaId ? { pesertaId } : {}),
+    peserta: { employee: { deletedAt: null }, ...saringPesertaAktif(status, pesertaId) },
   };
   const items = await prisma.magangTugas.findMany({
     where,
@@ -32,7 +34,7 @@ export const GET = route(async (req: Request) => {
       nama: t.peserta.employee.nickname || t.peserta.employee.fullName,
       pos: t.pos?.nama ?? "(pos dihapus)",
       // Dinilai dari dasbor (akun) atau dari halaman pribadi pembimbing (karyawan).
-      dinilaiOleh: t.dinilaiOleh?.name ?? (t.dinilaiOlehKaryawan ? t.dinilaiOlehKaryawan.nickname || t.dinilaiOlehKaryawan.fullName : null),
+      dinilaiOleh: namaPengurus(t.dinilaiOleh, t.dinilaiOlehKaryawan),
     })),
     belumDinilai: await prisma.magangTugas.count({ where: { dinilaiAt: null } }),
   });

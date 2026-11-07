@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { namaPengurus, saringPesertaAktif } from "@/lib/services/magang/pembimbing";
 import { requireManager, json, route } from "@/lib/http";
 import { serialisasiJurnal } from "@/lib/services/magang/jurnal-db";
 
@@ -12,7 +13,7 @@ export const GET = route(async (req: Request) => {
   const where: Prisma.MagangJurnalWhereInput = {
     ...(status === "belum" ? { dicekAt: null } : {}),
     ...(pesertaId ? { pesertaId } : {}),
-    peserta: { employee: { deletedAt: null } },
+    peserta: { employee: { deletedAt: null }, ...saringPesertaAktif(status, pesertaId) },
   };
   const items = await prisma.magangJurnal.findMany({
     where,
@@ -32,8 +33,8 @@ export const GET = route(async (req: Request) => {
       posId: j.posId,
       nama: j.peserta.employee.nickname || j.peserta.employee.fullName,
       // Dicek dari dasbor (akun) atau dari halaman pribadi pembimbing (karyawan).
-      dicekOleh: j.dicekOleh?.name ?? (j.dicekOlehKaryawan ? j.dicekOlehKaryawan.nickname || j.dicekOlehKaryawan.fullName : null),
+      dicekOleh: namaPengurus(j.dicekOleh, j.dicekOlehKaryawan),
     })),
-    belumDicek: await prisma.magangJurnal.count({ where: { dicekAt: null } }),
+    belumDicek: await prisma.magangJurnal.count({ where: { dicekAt: null, peserta: { aktif: true, employee: { deletedAt: null } } } }),
   });
 });

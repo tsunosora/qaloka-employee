@@ -7,6 +7,7 @@ import { hariIni, keYmd, serialisasiTugas } from "@/lib/services/magang/layanan"
 import { seninDari } from "@/lib/services/magang/rotasi";
 import { susunRapor } from "@/lib/services/magang/rapor";
 import { namaUsaha } from "@/lib/services/upah/data";
+import { namaPengurus } from "@/lib/services/magang/pembimbing";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -19,14 +20,14 @@ export const GET = route<Ctx>(async (_req, ctx) => {
     include: {
       employee: { select: { fullName: true, nickname: true } },
       penugasan: true,
-      tugas: { orderBy: { senin: "asc" }, include: { pos: { select: { nama: true } }, dinilaiOleh: { select: { name: true } } } },
+      tugas: { orderBy: { senin: "asc" }, include: { pos: { select: { nama: true } }, dinilaiOleh: { select: { name: true } }, dinilaiOlehKaryawan: { select: { fullName: true, nickname: true } } } },
     },
   });
   if (!p) return notFound("Peserta tidak ditemukan.");
   const pos = await prisma.magangPos.findMany({
     select: { id: true, nama: true, deskripsi: true, pembimbing: { select: { fullName: true } } },
   });
-  const tugas = p.tugas.map((t) => ({ ...serialisasiTugas(t), pos: t.pos?.nama ?? "(pos dihapus)", dinilaiOleh: t.dinilaiOleh?.name ?? null }));
+  const tugas = p.tugas.map((t) => ({ ...serialisasiTugas(t), pos: t.pos?.nama ?? "(pos dihapus)", dinilaiOleh: namaPengurus(t.dinilaiOleh, t.dinilaiOlehKaryawan) }));
   const rapor = susunRapor({
     penugasan: p.penugasan.map(keYmd),
     tugas: tugas.map((t) => ({ ...t, praktik: t.praktik })),
@@ -44,7 +45,7 @@ export const GET = route<Ctx>(async (_req, ctx) => {
     prisma.magangJurnal.findMany({
       where: { pesertaId: p.id },
       orderBy: { tanggal: "desc" },
-      include: { pos: { select: { nama: true } }, dicekOleh: { select: { name: true } } },
+      include: { pos: { select: { nama: true } }, dicekOleh: { select: { name: true } }, dicekOlehKaryawan: { select: { fullName: true, nickname: true } } },
     }),
   ]);
   const hariKerjaList = sampai >= mulai ? hariKerja(mulai, sampai, new Set(libur.map((l) => toYmd(l.date)))) : [];
@@ -58,7 +59,7 @@ export const GET = route<Ctx>(async (_req, ctx) => {
       ...serialisasiJurnal(j),
       pesertaId: p.id,
       nama: p.employee.nickname || p.employee.fullName,
-      dicekOleh: j.dicekOleh?.name ?? null,
+      dicekOleh: namaPengurus(j.dicekOleh, j.dicekOlehKaryawan),
     })),
     peserta: {
       id: p.id,
