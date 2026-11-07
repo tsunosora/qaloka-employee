@@ -88,7 +88,7 @@ export default function PosMagangPage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <Judul
         judul="Pos Kerja & Bank Soal"
-        keterangan="Pos yang dirotasi ke anak magang. Pos berat (perlu latihan tangan/alat) sebaiknya 2 minggu: minggu 1 didampingi, minggu 2 mandiri. Pos ringan cukup 1 minggu. Tiap pos punya bank soal; tiap akhir minggu anak mendapat 5 soal acak dari pos yang dia pegang."
+        keterangan="Pos yang dirotasi ke anak magang. Pos berat (perlu latihan tangan/alat) sebaiknya 2 minggu: minggu 1 didampingi, minggu 2 mandiri. Pos ringan cukup 1 minggu. Tiap pos punya bank soal; tiap Jumat anak mendapat sampai 5 soal acak dari pos yang dia pegang — isi minimal 5 soal per pos."
         aksi={
           <button onClick={() => setFormPos(posBaru())} className="btn-primary h-10 text-sm" disabled={!data}>
             <IconPlus className="text-[16px]" /> Tambah pos
@@ -104,7 +104,7 @@ export default function PosMagangPage() {
         <div className="glass rounded-2xl p-8 text-center">
           <p className="text-sm text-muted">Belum ada pos kerja.</p>
           <p className="mx-auto mt-1 max-w-md text-xs text-subtle">
-            Mulai dari contoh 7 pos percetakan (Operator Cetak, Setting File, CS & Kasir, Finishing, Gudang, Packing, Konten) lengkap dengan target belajar dan 3 soal tiap pos — semuanya bisa disunting.
+            Mulai dari contoh 7 pos percetakan (Operator Cetak, Setting File, CS & Kasir, Finishing, Gudang, Packing, Konten) lengkap dengan target belajar dan 5 soal tiap pos — semuanya bisa disunting.
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button
