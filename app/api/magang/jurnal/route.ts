@@ -28,6 +28,7 @@ export const GET = route(async (req: Request) => {
     items: items.map((j) => ({
       ...serialisasiJurnal(j),
       pesertaId: j.pesertaId,
+      posId: j.posId,
       nama: j.peserta.employee.nickname || j.peserta.employee.fullName,
       dicekOleh: j.dicekOleh?.name ?? null,
     })),

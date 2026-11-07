@@ -91,6 +91,11 @@ export const jurnalSchema = z.object({
 });
 
 export const cekJurnalSchema = z.object({ komentar: teksOpsional(2000) });
+/** Tandai banyak jurnal sekaligus (satu anak) — tanpa komentar per jurnal. */
+export const cekJurnalMassalSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1, "Pilih jurnal yang dicek").max(200),
+  komentar: teksOpsional(2000),
+});
 
 export const tautanDaftarSchema = z
   .object({

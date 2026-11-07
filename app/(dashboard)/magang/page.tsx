@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/fetcher";
 import { IconArrowRight, IconCheck } from "@/components/ui/icons";
 import { NilaiTugas, type TugasAdmin } from "@/components/magang/NilaiTugas";
-import { DaftarJurnal, type JurnalAdmin } from "@/components/magang/DaftarJurnal";
+import { DaftarJurnalPerAnak, type JurnalAdmin } from "@/components/magang/DaftarJurnal";
 import { ChipStatus, Judul, Kosong, Memuat, Pesan, tglPendek, warnaNilai, type StatusTugas } from "@/components/magang/ui";
 
 type Anak = {
@@ -217,7 +217,7 @@ export default function MagangPage() {
             ) : jurnal.length === 0 ? (
               <Kosong>Semua jurnal yang masuk sudah dicek.</Kosong>
             ) : (
-              <DaftarJurnal
+              <DaftarJurnalPerAnak
                 items={jurnal}
                 onDicek={(nama) => {
                   setNotice(`Jurnal ${nama} ditandai sudah dicek.`);

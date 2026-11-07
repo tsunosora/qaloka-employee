@@ -54,6 +54,26 @@ export function kerajinan(terisi: readonly string[], hari: readonly string[]): {
   return { terisi: n, dari: hari.length, persen: hari.length ? Math.round((n / hari.length) * 100) : null };
 }
 
+/**
+ * Kelompokkan jurnal per anak untuk daftar "belum dicek" pembimbing — dulu satu kartu per hari per anak
+ * (±30 kartu/minggu untuk 5 anak). Anak yang jurnal tertuanya paling lama menunggu tampil paling atas;
+ * di dalam kelompok, jurnal terbaru dulu.
+ */
+export function kelompokkanPerAnak<T extends { pesertaId: number; nama: string; tanggal: string }>(
+  items: readonly T[]
+): { pesertaId: number; nama: string; items: T[]; tertua: string }[] {
+  const peta = new Map<number, { pesertaId: number; nama: string; items: T[]; tertua: string }>();
+  for (const j of items) {
+    const g = peta.get(j.pesertaId) ?? { pesertaId: j.pesertaId, nama: j.nama, items: [], tertua: j.tanggal };
+    g.items.push(j);
+    if (j.tanggal < g.tertua) g.tertua = j.tanggal;
+    peta.set(j.pesertaId, g);
+  }
+  const hasil = [...peta.values()];
+  for (const g of hasil) g.items.sort((a, b) => (a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : 0));
+  return hasil.sort((a, b) => (a.tertua < b.tertua ? -1 : a.tertua > b.tertua ? 1 : a.nama.localeCompare(b.nama, "id")));
+}
+
 /** Daftar path foto dari kolom JSON (aman bila isinya rusak). */
 export function daftarFoto(j: unknown): string[] {
   return Array.isArray(j) ? j.filter((x): x is string => typeof x === "string").slice(0, MAKS_FOTO) : [];
