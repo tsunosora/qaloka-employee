@@ -27,6 +27,11 @@ describe("cetak selalu terang", () => {
     expect(b).toMatch(/--bg:\s*#ffffff/i);
     expect(b).toMatch(/--fg:\s*#18181b/i);
   });
+  it("tata letak dasbor tidak menambah halaman kosong saat dicetak (min-h-screen & padding dimatikan)", () => {
+    const layout = readFileSync(path.join(__dirname, "..", "app", "(dashboard)", "layout.tsx"), "utf8");
+    expect(layout).toMatch(/min-h-screen[^"]*print:min-h-0/);
+    expect(layout).toMatch(/<main className="[^"]*print:p-0/);
+  });
   it("blok cetak ada SESUDAH token gelap & terang (urutan menentukan yang menang)", () => {
     expect(css.indexOf("@media print")).toBeGreaterThan(css.indexOf(".light {"));
   });

@@ -21,7 +21,7 @@ export default async function DashboardLayout({
 
   return (
     <LisensiProvider nilai={lisensi}>
-    <div className="ambient relative flex min-h-screen bg-bg">
+    <div className="ambient relative flex min-h-screen bg-bg print:block print:min-h-0">
       {/* print:hidden — halaman cetak (mis. rapor magang) tanpa menu & kepala. */}
       <div className="contents print:hidden">
         <Sidebar role={session.user?.role} />
@@ -30,7 +30,7 @@ export default async function DashboardLayout({
         <div className="contents print:hidden">
           <Header name={session.user?.name} role={session.user?.role} />
         </div>
-        <main className="min-w-0 flex-1 p-4 sm:p-6">
+        <main className="min-w-0 flex-1 p-4 sm:p-6 print:p-0">
           <SpandukLisensi />
           <PenjagaHalaman>{children}</PenjagaHalaman>
         </main>
