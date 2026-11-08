@@ -17,8 +17,9 @@ import {
   keadaanJendela,
   jendelaTugas,
   seninDari,
+  hariTugasMagang,
 } from "@/lib/services/magang/layanan";
-import { tanpaKunci, periksaKuis, ASPEK_PRAKTIK, SKALA, MIN_INGATAN } from "@/lib/services/magang/nilai";
+import { tanpaKunci, periksaKuis, namaHariTugas, ASPEK_PRAKTIK, SKALA, MIN_INGATAN } from "@/lib/services/magang/nilai";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -42,9 +43,10 @@ export const GET = route<Ctx>(async (req, ctx) => {
   const hari = hariIni();
   const seninIni = seninDari(hari);
   const pen = p.penugasan.map(keYmd);
-  const [pos, riwayat] = await Promise.all([
+  const [pos, riwayat, hariTugas] = await Promise.all([
     prisma.magangPos.findMany({ select: { id: true, nama: true, deskripsi: true, pembimbing: { select: { fullName: true } } } }),
     prisma.magangTugas.findMany({ where: { pesertaId: p.id }, orderBy: { senin: "desc" }, include: { pos: { select: { nama: true } } } }),
+    hariTugasMagang(prisma),
   ]);
   const posMap = new Map(pos.map((x) => [x.id, x]));
   const infoPos = (id: number) => ({
@@ -56,15 +58,15 @@ export const GET = route<Ctx>(async (req, ctx) => {
   const ini = penugasanPada(pen, seninIni);
   const berikut = pen.find((a) => a.mulai > seninIni);
   const sudah = new Set(riwayat.map((t) => toYmd(t.senin)));
-  const terbuka = mingguTugas(pen, sudah, hari);
+  const terbuka = mingguTugas(pen, sudah, hari, hariTugas);
   const tugasTerbuka = await Promise.all(
     terbuka.map(async (senin) => {
       const a = penugasanPada(pen, senin)!;
       const soal = await soalMinggu(prisma, p.id, a.posId, senin);
       return {
         senin,
-        ...jendelaTugas(senin),
-        keadaan: keadaanJendela(senin, hari),
+        ...jendelaTugas(senin, hariTugas),
+        keadaan: keadaanJendela(senin, hari, hariTugas),
         pos: infoPos(a.posId).nama,
         mingguKe: mingguKe(a, senin),
         dari: a.minggu,
@@ -81,7 +83,8 @@ export const GET = route<Ctx>(async (req, ctx) => {
     posIni: ini ? { ...infoPos(ini.posId), mingguKe: mingguKe(ini, seninIni), dari: ini.minggu, berbagi: ini.berbagi } : null,
     posBerikut: berikut ? { nama: infoPos(berikut.posId).nama, mulai: berikut.mulai } : null,
     jadwal: pen.map((a) => ({ mulai: a.mulai, minggu: a.minggu, pos: infoPos(a.posId).nama })),
-    bukaBerikut: ini && !terbuka.includes(seninIni) && !sudah.has(seninIni) ? jendelaTugas(seninIni).buka : null,
+    bukaBerikut: ini && !terbuka.includes(seninIni) && !sudah.has(seninIni) ? jendelaTugas(seninIni, hariTugas).buka : null,
+    hariTugas: namaHariTugas(hariTugas),
     tugasTerbuka,
     riwayat: riwayat.map((t) => ({ ...serialisasiTugas(t), pos: t.pos?.nama ?? "(pos dihapus)" })),
     aspek: ASPEK_PRAKTIK,
@@ -104,8 +107,9 @@ export const POST = route<Ctx>(async (req, ctx) => {
   const hari = hariIni();
   if (senin !== seninDari(senin)) return badRequest({ senin: ["Minggu tidak sah."] });
   if (senin > seninDari(hari)) return badRequest({ senin: ["Minggu ini belum bisa diisi."] });
-  const keadaan = keadaanJendela(senin, hari);
-  if (keadaan === "belum") return badRequest({ senin: [`Tugas minggu ini dibuka mulai hari Jumat.`] });
+  const hariTugas = await hariTugasMagang(prisma);
+  const keadaan = keadaanJendela(senin, hari, hariTugas);
+  if (keadaan === "belum") return badRequest({ senin: [`Tugas minggu ini dibuka mulai hari ${namaHariTugas(hariTugas)}.`] });
 
   const a = penugasanPada(p.penugasan.map(keYmd), senin);
   if (!a) return badRequest({ senin: ["Kamu tidak punya pos kerja di minggu itu."] });

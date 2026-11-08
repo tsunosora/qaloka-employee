@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, route } from "@/lib/http";
 import { atMidnight, toYmd } from "@/lib/services/leave/service";
-import { hariIni, keYmd } from "@/lib/services/magang/layanan";
+import { hariIni, hariTugasMagang, keYmd } from "@/lib/services/magang/layanan";
 import { seninDari, tambahMinggu, penugasanPada, mingguKe } from "@/lib/services/magang/rotasi";
 import { keadaanJendela } from "@/lib/services/magang/nilai";
 
@@ -12,7 +12,7 @@ export const GET = route(async () => {
   const seninIni = seninDari(hari);
   const seninLalu = tambahMinggu(seninIni, -1);
 
-  const [peserta, pos, belumDinilai, jumlahPos] = await Promise.all([
+  const [peserta, pos, belumDinilai, jumlahPos, hariTugas] = await Promise.all([
     prisma.magangPeserta.findMany({
       where: { aktif: true, employee: { deletedAt: null, isActive: true } },
       orderBy: { id: "asc" },
@@ -26,19 +26,21 @@ export const GET = route(async () => {
     prisma.magangPos.findMany({ select: { id: true, nama: true, pembimbing: { select: { fullName: true } } } }),
     prisma.magangTugas.count({ where: { dinilaiAt: null, peserta: { aktif: true, employee: { deletedAt: null } } } }),
     prisma.magangPos.count({ where: { aktif: true, deletedAt: null } }),
+    hariTugasMagang(prisma),
   ]);
   const posMap = new Map(pos.map((p) => [p.id, p]));
 
   const statusTugas = (t: { nilai: number | null; dinilaiAt: Date | null } | undefined, senin: string, adaPenugasan: boolean) => {
     if (!adaPenugasan) return "tanpa-pos";
     if (t) return t.dinilaiAt ? "dinilai" : "menunggu-nilai";
-    const k = keadaanJendela(senin, hari);
+    const k = keadaanJendela(senin, hari, hariTugas);
     return k === "belum" ? "belum-buka" : k === "buka" ? "belum-diisi" : "terlambat";
   };
 
   return json({
     hariIni: hari,
     seninIni,
+    hariTugas,
     jumlahPos,
     belumDinilai,
     peserta: peserta.map((p) => {

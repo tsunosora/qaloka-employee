@@ -127,17 +127,40 @@ export function predikat(nilai: number | null): string {
   return "Perlu bimbingan";
 }
 
-/**
- * Jendela pengisian tugas minggu (Senin `senin`): dibuka JUMAT minggu itu, tepat waktu sampai
- * Senin berikutnya (anak yang libur Sabtu–Minggu masih bisa mengisi Senin pagi). Sesudah itu masih
- * boleh mengisi, tapi ditandai terlambat.
- */
-export function jendelaTugas(senin: string): { buka: string; batas: string } {
-  return { buka: tambahHari(senin, 4), batas: tambahHari(senin, 7) };
+/** Hari dibukanya tugas mengingat: 1 = Senin … 6 = Sabtu (getDay). Bawaan Jumat — instalasi lama tidak berubah. */
+export const HARI_TUGAS_BAWAAN = 5;
+export const KUNCI_HARI_TUGAS = "magang_hari_tugas";
+export const PILIHAN_HARI_TUGAS = [
+  { nilai: 1, label: "Senin" },
+  { nilai: 2, label: "Selasa" },
+  { nilai: 3, label: "Rabu" },
+  { nilai: 4, label: "Kamis" },
+  { nilai: 5, label: "Jumat" },
+  { nilai: 6, label: "Sabtu" },
+] as const;
+
+/** Nilai setelan (teks/angka/kosong) → 1..6; selain itu bawaan Jumat. */
+export function normalHariTugas(v: unknown): number {
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+  return Number.isInteger(n) && n >= 1 && n <= 6 ? n : HARI_TUGAS_BAWAAN;
 }
 
-export function keadaanJendela(senin: string, hariIni: string): "belum" | "buka" | "terlambat" {
-  const { buka, batas } = jendelaTugas(senin);
+export function namaHariTugas(hariTugas: number): string {
+  return PILIHAN_HARI_TUGAS[normalHariTugas(hariTugas) - 1].label;
+}
+
+/**
+ * Jendela pengisian tugas minggu (Senin `senin`): dibuka pada `hariTugas` minggu itu (bawaan Jumat),
+ * tepat waktu sampai Senin berikutnya (anak yang libur Sabtu–Minggu masih bisa mengisi Senin pagi).
+ * Batas SELALU Senin berikutnya — hari = Sabtu tetap memberi Sabtu, Minggu, Senin. Sesudah itu masih
+ * boleh mengisi, tapi ditandai terlambat.
+ */
+export function jendelaTugas(senin: string, hariTugas: number = HARI_TUGAS_BAWAAN): { buka: string; batas: string } {
+  return { buka: tambahHari(senin, normalHariTugas(hariTugas) - 1), batas: tambahHari(senin, 7) };
+}
+
+export function keadaanJendela(senin: string, hariIni: string, hariTugas: number = HARI_TUGAS_BAWAAN): "belum" | "buka" | "terlambat" {
+  const { buka, batas } = jendelaTugas(senin, hariTugas);
   if (hariIni < buka) return "belum";
   if (hariIni <= batas) return "buka";
   return "terlambat";

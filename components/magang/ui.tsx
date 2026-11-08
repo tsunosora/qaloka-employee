@@ -13,7 +13,7 @@ const STATUS: Record<StatusTugas, { label: string; warna: string }> = {
   "tanpa-pos": { label: "Tidak ada pos", warna: "var(--fg-subtle)" },
   dinilai: { label: "Sudah dinilai", warna: "var(--success)" },
   "menunggu-nilai": { label: "Perlu dinilai", warna: "var(--warning)" },
-  "belum-buka": { label: "Dibuka Jumat", warna: "var(--fg-muted)" },
+  "belum-buka": { label: "Belum dibuka", warna: "var(--fg-muted)" },
   "belum-diisi": { label: "Belum diisi", warna: "var(--info)" },
   terlambat: { label: "Terlambat, belum diisi", warna: "var(--danger)" },
 };

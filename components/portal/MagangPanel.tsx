@@ -35,6 +35,7 @@ type Data =
       posBerikut: { nama: string; mulai: string } | null;
       jadwal: { mulai: string; minggu: number; pos: string }[];
       bukaBerikut: string | null;
+      hariTugas?: string;
       tugasTerbuka: Terbuka[];
       riwayat: Riwayat[];
       aspek: readonly { key: string; label: string }[];
@@ -119,7 +120,7 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
         <Card title="Tugas mengingat">
           <p className="text-sm text-muted">
             {data.bukaBerikut
-              ? `Tugas minggu ini dibuka hari Jumat, ${longDate(data.bukaBerikut)}. Sambil menunggu, catat hal-hal penting yang kamu pelajari — tapi saat mengisi nanti, tulis dari ingatan.`
+              ? `Tugas minggu ini dibuka hari ${data.hariTugas ?? "Jumat"}, ${longDate(data.bukaBerikut)}. Sambil menunggu, catat hal-hal penting yang kamu pelajari — tapi saat mengisi nanti, tulis dari ingatan.`
               : "Tidak ada tugas yang perlu diisi sekarang."}
           </p>
         </Card>

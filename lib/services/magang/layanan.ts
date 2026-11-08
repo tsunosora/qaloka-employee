@@ -1,12 +1,18 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { atMidnight, toYmd } from "@/lib/services/leave/service";
 import { susunRotasi, seninDari, tambahMinggu, penugasanPada, mingguKe, type PenugasanAda } from "./rotasi";
-import { keadaanJendela, jendelaTugas, nilaiMinggu, pilihSoal, type JawabanKuis, type SoalBank } from "./nilai";
+import { keadaanJendela, jendelaTugas, nilaiMinggu, pilihSoal, normalHariTugas, HARI_TUGAS_BAWAAN, KUNCI_HARI_TUGAS, type JawabanKuis, type SoalBank } from "./nilai";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
 export function hariIni(): string {
   return toYmd(new Date());
+}
+
+/** Setelan hari tugas mengingat (Setting `magang_hari_tugas`, 1=Senin … 6=Sabtu; bawaan Jumat). */
+export async function hariTugasMagang(db: Db): Promise<number> {
+  const row = await db.setting.findUnique({ where: { key: KUNCI_HARI_TUGAS }, select: { value: true } });
+  return normalHariTugas(row?.value);
 }
 
 export type PenugasanYmd = { id: number; pesertaId: number; posId: number; mulai: string; minggu: number; berbagi: boolean };
@@ -136,15 +142,15 @@ export function dataPenilaian(
 }
 
 /**
- * Minggu-minggu yang tugasnya bisa/harus diisi anak hari ini: minggu ini (bila sudah Jumat) dan
+ * Minggu-minggu yang tugasnya bisa/harus diisi anak hari ini: minggu ini (bila sudah hari tugas) dan
  * minggu-minggu lalu dalam masa magangnya yang belum diisi (terlambat). Paling lama dulu.
  */
-export function mingguTugas(penugasan: readonly PenugasanYmd[], sudahDiisi: ReadonlySet<string>, hari: string, maks = 4): string[] {
+export function mingguTugas(penugasan: readonly PenugasanYmd[], sudahDiisi: ReadonlySet<string>, hari: string, hariTugas: number = HARI_TUGAS_BAWAAN, maks = 4): string[] {
   const seninIni = seninDari(hari);
   const semua: string[] = [];
   for (const a of penugasan) for (let k = 0; k < a.minggu; k++) semua.push(tambahMinggu(a.mulai, k));
   return [...new Set(semua)]
-    .filter((s) => s <= seninIni && !sudahDiisi.has(s) && keadaanJendela(s, hari) !== "belum")
+    .filter((s) => s <= seninIni && !sudahDiisi.has(s) && keadaanJendela(s, hari, hariTugas) !== "belum")
     .sort()
     .slice(-maks);
 }

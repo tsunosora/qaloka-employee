@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { toYmd } from "@/lib/services/leave/service";
 import { atMidnight } from "@/lib/services/leave/service";
-import { hariIni, keYmd, mingguTugas, penugasanPada, seninDari } from "./layanan";
+import { hariIni, hariTugasMagang, keYmd, mingguTugas, penugasanPada, seninDari } from "./layanan";
 import { tambahHari } from "./rotasi";
 import { bolehSunting, daftarFoto, tanggalBolehIsi } from "./jurnal";
 
@@ -17,7 +17,7 @@ export async function pesertaPortal(employeeId: number) {
   const hari = hariIni();
   // Tugas mengingat yang masih terbuka & belum dikirim → riwayat jurnal ditahan supaya tulisan
   // mingguannya tetap dari ingatan, bukan menyalin jurnal.
-  const tugasTerbuka = mingguTugas(penugasan, new Set(p.tugas.map((t) => toYmd(t.senin))), hari).length > 0;
+  const tugasTerbuka = mingguTugas(penugasan, new Set(p.tugas.map((t) => toYmd(t.senin))), hari, await hariTugasMagang(prisma)).length > 0;
   // Libur nasional di sekitar hari ini → tidak ikut jendela isi jurnal (sama dengan hitungan rapor).
   const libur = new Set(
     (await prisma.holiday.findMany({ where: { date: { gte: atMidnight(tambahHari(hari, -14)), lte: atMidnight(hari) } }, select: { date: true } })).map((h) => toYmd(h.date))

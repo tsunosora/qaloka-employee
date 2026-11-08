@@ -14,7 +14,7 @@ bahan penilaian — supaya di akhir magang dia punya pengalaman nyata + rapor un
 3. **Rotasi Pos** — *Susun rotasi* mulai minggu tertentu. Penugasan sebelum minggu itu tidak
    berubah; sesudahnya disusun ulang. Klik blok untuk mengganti pos/lama satu penugasan.
 4. **Halaman pribadi anak → tab Magang** — pos minggu ini + target, pos berikutnya, jadwal, dan
-   **tugas mengingat**: dibuka Jumat, tepat waktu sampai Senin berikutnya, sesudahnya masih bisa
+   **tugas mengingat**: dibuka pada *hari tugas* (setelan, bawaan Jumat), tepat waktu sampai Senin berikutnya, sesudahnya masih bisa
    diisi tapi ditandai terlambat. Isinya (1) tulisan dari ingatan, minimal 80 huruf, (2) maksimal
    5 soal acak dari bank soal pos itu (tetap per anak+minggu). Sekali kirim, tidak bisa diubah.
 5. **Minggu Ini** — pos tiap anak, status tugas minggu ini/lalu, daftar *Perlu dinilai* (bisa disaring per pos;
@@ -79,3 +79,15 @@ Simulasi penuh 13 minggu (laporan `D:\FAISAL\laporan-magang\`) menemukan 9 hal; 
 - **Pesan pendaftar ditolak** diberi tanda baca (`pesanDitolak()`).
 - **Cetak selalu terang**: blok `@media print` di `app/globals.css` menimpa token tema (berlaku semua halaman).
 - Penahan pendaftaran (30/jam per IP) ada di memori proses — cukup untuk satu instalasi; hilang saat restart.
+
+## Hari tugas mengingat bisa diatur (8 Nov 2026)
+
+- **Minggu Ini → Setelan tugas mengingat**: pilih Senin–Sabtu (tersimpan begitu dipilih; `PUT /api/magang/setelan`,
+  minimal Manajer). Disimpan di `Setting` kunci `magang_hari_tugas` (`"1"`…`"6"`). Kosong/tak sah = **Jumat**
+  → instalasi lain tidak berubah. Tanpa migrasi.
+- Aturan (`nilai.ts`: `jendelaTugas`/`keadaanJendela(senin, hari, hariTugas)`): buka = Senin minggu itu + (hari − 1);
+  batas tepat waktu TETAP Senin berikutnya (Sabtu → Sabtu, Minggu, Senin; Selasa = terlambat). Minggu tugas tetap
+  Senin minggu itu (Sabtu/Minggu ikut minggu rotasi yang sama). Ikut setelan: pembukaan di HP anak, kiriman (400
+  "dibuka mulai hari …"), status Minggu Ini ("Dibuka Sabtu"), penahan riwayat jurnal, teks HP & dasbor.
+- Tes: `tests/magang-hari-tugas.test.ts`.
+- Voliko memakai **Sabtu** (permintaan Faisal).

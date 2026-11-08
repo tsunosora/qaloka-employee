@@ -6,6 +6,8 @@ import { api } from "@/lib/fetcher";
 import { IconArrowRight, IconCheck } from "@/components/ui/icons";
 import { NilaiTugas, type TugasAdmin } from "@/components/magang/NilaiTugas";
 import { DaftarJurnalPerAnak, type JurnalAdmin } from "@/components/magang/DaftarJurnal";
+import { SetelanHariTugas } from "@/components/magang/SetelanHariTugas";
+import { namaHariTugas } from "@/lib/services/magang/nilai";
 import { ChipStatus, Judul, Kosong, Memuat, Pesan, tglPendek, warnaNilai, type StatusTugas } from "@/components/magang/ui";
 
 type Anak = {
@@ -23,7 +25,10 @@ type Anak = {
   adaRotasi: boolean;
   jurnalHariIni: boolean;
 };
-type Ringkasan = { hariIni: string; seninIni: string; jumlahPos: number; belumDinilai: number; peserta: Anak[] };
+type Ringkasan = { hariIni: string; seninIni: string; hariTugas: number; jumlahPos: number; belumDinilai: number; peserta: Anak[] };
+
+/** "Dibuka Jumat" mengikuti setelan hari tugas. */
+const labelStatus = (s: StatusTugas, hariTugas: number) => (s === "belum-buka" ? `Dibuka ${namaHariTugas(hariTugas)}` : undefined);
 
 export default function MagangPage() {
   const [data, setData] = useState<Ringkasan | null>(null);
@@ -86,7 +91,9 @@ export default function MagangPage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <Judul
         judul="Magang — Minggu Ini"
-        keterangan="Siapa memegang pos apa minggu ini, dan tugas mengingat akhir minggu yang perlu dinilai. Tugas dibuka untuk anak tiap Jumat lewat halaman pribadinya."
+        keterangan={`Siapa memegang pos apa minggu ini, dan tugas mengingat akhir minggu yang perlu dinilai. Tugas dibuka untuk anak tiap ${
+          data ? namaHariTugas(data.hariTugas) : "akhir minggu"
+        } lewat halaman pribadinya.`}
       />
       {notice && <Pesan jenis="ok">{notice}</Pesan>}
       {galat && <Pesan jenis="galat">{galat}</Pesan>}
@@ -166,13 +173,13 @@ export default function MagangPage() {
                       <div>
                         <dt className="text-subtle">Tugas minggu lalu</dt>
                         <dd className="mt-0.5">
-                          <ChipStatus status={p.tugasLalu} />
+                          <ChipStatus status={p.tugasLalu} label={labelStatus(p.tugasLalu, data.hariTugas)} />
                         </dd>
                       </div>
                       <div>
                         <dt className="text-subtle">Tugas minggu ini</dt>
                         <dd className="mt-0.5">
-                          <ChipStatus status={p.tugasIni} />
+                          <ChipStatus status={p.tugasIni} label={labelStatus(p.tugasIni, data.hariTugas)} />
                         </dd>
                       </div>
                     </dl>
@@ -251,6 +258,15 @@ export default function MagangPage() {
               />
             )}
           </section>
+
+          <SetelanHariTugas
+            key={data.hariTugas}
+            hariTugas={data.hariTugas}
+            onSaved={(namaHari) => {
+              setNotice(`Tugas mengingat kini dibuka tiap hari ${namaHari}.`);
+              muat();
+            }}
+          />
         </>
       )}
 
