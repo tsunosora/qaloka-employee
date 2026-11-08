@@ -90,4 +90,6 @@ Simulasi penuh 13 minggu (laporan `D:\FAISAL\laporan-magang\`) menemukan 9 hal; 
   Senin minggu itu (Sabtu/Minggu ikut minggu rotasi yang sama). Ikut setelan: pembukaan di HP anak, kiriman (400
   "dibuka mulai hari …"), status Minggu Ini ("Dibuka Sabtu"), penahan riwayat jurnal, teks HP & dasbor.
 - Tes: `tests/magang-hari-tugas.test.ts`.
-- Voliko memakai **Sabtu** (permintaan Faisal).
+- Voliko memakai **Sabtu** (permintaan Faisal): `f1c2349` terdeploy 8 Nov 15.38 (skrip `~/alat/deploy-rms-haritugas-20261108.sh`),
+  setelan dipasang 15.38.57 lewat `PUT /api/magang/setelan` sebagai admin (`~/alat/setel-hari-tugas-sabtu-20261108.sh`).
+  Exindo tetap bawaan Jumat (belum dideploy).
