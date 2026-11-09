@@ -218,3 +218,25 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
   401, dasbor tanpa login 302; /me /absen /login 200; log galat tidak bertambah; absensi hari ini (Fingerspot 16, HP 7) & jurnal (4)
   identik. Unggah lampiran SAH sengaja tidak diuji di produksi (akan membuat pengajuan sungguhan + notifikasi manajer; tidak ada rute
   hapus pengajuan) — diuji di DB uji lokal.
+
+## 7 peserta — rombongan SMK N 4 Yogyakarta + susun ulang 16 Nov (9 Nov 2026 23.25, Voliko)
+
+- Peserta baru #5 Aqila, #6 Cerry, #7 Putra (SMK N 4 Yogyakarta, Usaha Layanan Pariwisata; guru pembimbing tercatat) mendaftar
+  sendiri & disetujui 21.16–21.17 (PIN dibuat anak sendiri), mulai **9 Nov** (= hari masuk; joinDate sama → hari sebelum mulai tidak
+  dihitung), selesai **15 Apr 2027** (diisi, sama untuk ketiganya). Absen HP sudah menyala.
+- Ditemukan: pukul 21.35 ada "Susun ulang semua" dari 9 Nov saat Orientasi masih aktif → Orientasi ikut berputar sampai April
+  dan ada minggu kosong. Pos 14 "Konten: Editing…" dinonaktifkan 20.56 (digabung ke pos 13 "Konten: Shooting & Talent, Editing,
+  Copywriting & Posting") → pos utama aktif = 13, 15, 16, 17.
+- Diperbaiki lewat API admin (`~/alat/susun-rotasi-7anak-20261109.sh` + `.log`; cadangan `~/cadangan/magang-7anak-20261109-232515/`
+  = dump semua tabel Magang + setelan + penugasan sebelum/sesudah): tugas/kiriman/jurnal ≥16 Nov = 0 → Orientasi nonaktif sementara
+  → `POST /api/magang/rotasi {dari:2026-11-16, mode:"semua"}` (73 blok baru, 0 berbagi, Orientasi tak muncul sesudah 16 Nov) →
+  Orientasi aktif lagi. Minggu 9–14 Nov ketujuh anak di Orientasi TIDAK diubah (3 baris bertanda berbagi karena Orientasi kap 4 < 7
+  anak — tanda saja). Tiap anak memegang keempat pos utama dalam 8 minggu, maks 2 anak per pos per minggu.
+- Tim/lokasi di catatan peserta (pasangan SEMENTARA, jenis kelamin tak tercatat): **Tim A** Rizki, Yufita, Aqila, Cerry — Pusat
+  16 Nov–10 Jan, Cabang 11 Jan–7 Mar, Pusat 8 Mar–selesai; **Tim B** Alif, Marisa, Putra — kebalikannya. Pos Voliko Sport selalu di
+  Voliko Sport. Satu pos tiap blok: Rizki+Aqila, Yufita+Cerry, Alif+Putra; Marisa sendiri.
+- Kesalahan skrip & pemulihannya: PATCH pos 8 membawa deskripsi dari `mysql -B` (baris baru jadi teks `\n`) → dipulihkan dari
+  cadangan (`~/alat/pulihkan-deskripsi-orientasi-20261109.sh` + `.log`, hasil identik dengan cadangan). Pelajaran: pakai `mysql -r`
+  (raw) bila keluaran dijadikan JSON.
+- Verifikasi API (`~/alat/verifikasi-7anak-20261109.log`, sesi portal 5 menit, GET): 7 anak posIni Orientasi, berikut = jadwal 16 Nov,
+  19 misi tampil (side quest otomatis), /me 200; Bimbingan Faisal 5 pos aktif + Orientasi.
