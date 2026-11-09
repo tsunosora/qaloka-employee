@@ -9,11 +9,14 @@ import { DaftarJurnalPerAnak, type JurnalAdmin } from "@/components/magang/Dafta
 import { SetelanHariTugas } from "@/components/magang/SetelanHariTugas";
 import { namaHariTugas } from "@/lib/services/magang/nilai";
 import { ChipStatus, Judul, Kosong, Memuat, Pesan, tglPendek, warnaNilai, type StatusTugas } from "@/components/magang/ui";
+import { daftarSekolah, sekolahSama } from "@/lib/services/magang/sekolah";
+import { labelSingkatKategori } from "@/lib/services/magang/rapor";
 
 type Anak = {
   id: number;
   nama: string;
   namaLengkap: string;
+  sekolah: string | null;
   publicToken: string | null;
   mulai: string;
   selesai: string | null;
@@ -24,8 +27,17 @@ type Anak = {
   rataNilai: number | null;
   adaRotasi: boolean;
   jurnalHariIni: boolean;
+  sideQuest: { kategori: { kategori: string; selesai: number; total: number }[]; menunggu: number; selesai: number; total: number } | null;
 };
-type Ringkasan = { hariIni: string; seninIni: string; hariTugas: number; jumlahPos: number; belumDinilai: number; peserta: Anak[] };
+type Ringkasan = {
+  hariIni: string;
+  seninIni: string;
+  hariTugas: number;
+  jumlahPos: number;
+  belumDinilai: number;
+  misiMenunggu: number;
+  peserta: Anak[];
+};
 
 /** "Dibuka Jumat" mengikuti setelan hari tugas. */
 const labelStatus = (s: StatusTugas, hariTugas: number) => (s === "belum-buka" ? `Dibuka ${namaHariTugas(hariTugas)}` : undefined);
@@ -40,6 +52,8 @@ export default function MagangPage() {
   const [jurnal, setJurnal] = useState<JurnalAdmin[] | null>(null);
   // Saring "Perlu dinilai" & jurnal per pos (0 = semua pos) — tiap pembimbing cukup melihat posnya.
   const [filterPos, setFilterPos] = useState(0);
+  // Saring daftar anak per sekolah (kunci sekolah; "" = semua). Nama sekolah diketik bebas → bandingkan lewat kunci.
+  const [filterSekolah, setFilterSekolah] = useState("");
 
   const ambil = useCallback(
     () =>
@@ -87,6 +101,10 @@ export default function MagangPage() {
   const tugasTampil = tugas?.filter((t) => cocokPos(t.posId)) ?? null;
   const jurnalTampil = jurnal?.filter((j) => cocokPos(j.posId)) ?? null;
 
+  const pilihanSekolah = daftarSekolah(data?.peserta.map((p) => p.sekolah) ?? []);
+  const sekolahAktif = pilihanSekolah.some((s) => s.kunci === filterSekolah) ? filterSekolah : "";
+  const pesertaTampil = data?.peserta.filter((p) => !sekolahAktif || sekolahSama(p.sekolah, sekolahAktif)) ?? [];
+
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <Judul
@@ -94,6 +112,11 @@ export default function MagangPage() {
         keterangan={`Siapa memegang pos apa minggu ini, dan tugas mengingat akhir minggu yang perlu dinilai. Tugas dibuka untuk anak tiap ${
           data ? namaHariTugas(data.hariTugas) : "akhir minggu"
         } lewat halaman pribadinya.`}
+        aksi={
+          <Link href="/magang/rapor/sekolah" className="btn-ghost h-11 px-3 text-sm">
+            Cetak rapor per sekolah
+          </Link>
+        }
       />
       {notice && <Pesan jenis="ok">{notice}</Pesan>}
       {galat && <Pesan jenis="galat">{galat}</Pesan>}
@@ -128,19 +151,49 @@ export default function MagangPage() {
             </section>
           )}
 
+          {data.misiMenunggu > 0 && (
+            <Link
+              href="/magang/misi"
+              className="glass flex min-h-11 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm transition hover:bg-surface-2"
+            >
+              <span>
+                <b className="text-warning">{data.misiMenunggu}</b> <span className="text-fg">bukti side quest menunggu diperiksa</span>
+              </span>
+              <span className="inline-flex items-center gap-1 font-semibold text-primary">
+                Periksa <IconArrowRight />
+              </span>
+            </Link>
+          )}
+
           {data.peserta.length === 0 ? (
             siap ? <Kosong>Belum ada anak magang aktif.</Kosong> : null
           ) : (
             <section>
-              <h2 className="mb-2 text-sm font-bold text-fg">Pos minggu ini · mulai {tglPendek(data.seninIni)}</h2>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-bold text-fg">Pos minggu ini · mulai {tglPendek(data.seninIni)}</h2>
+                {pilihanSekolah.length > 1 && (
+                  <label className="flex items-center gap-2 text-sm text-muted">
+                    Sekolah
+                    <select className="input h-11 w-auto text-sm" value={sekolahAktif} onChange={(e) => setFilterSekolah(e.target.value)}>
+                      <option value="">Semua sekolah</option>
+                      {pilihanSekolah.map((s) => (
+                        <option key={s.kunci} value={s.kunci}>
+                          {s.label} ({s.jumlah})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
               <ul className="grid gap-3 sm:grid-cols-2">
-                {data.peserta.map((p) => (
+                {pesertaTampil.map((p) => (
                   <li key={p.id} className="glass rounded-2xl p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-display font-bold text-fg" title={p.namaLengkap}>
                           {p.nama}
                         </p>
+                        {p.sekolah && <p className="truncate text-xs text-muted">{p.sekolah}</p>}
                         {p.posIni ? (
                           <p className="text-sm text-fg">
                             {p.posIni.nama}
@@ -183,6 +236,26 @@ export default function MagangPage() {
                         </dd>
                       </div>
                     </dl>
+                    {p.sideQuest && p.sideQuest.total > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs text-subtle">
+                          Side quest
+                          {p.sideQuest.menunggu > 0 && <span className="text-warning"> · {p.sideQuest.menunggu} menunggu diperiksa</span>}
+                        </p>
+                        <ul className="mt-1 flex flex-wrap gap-1.5" aria-label={`Side quest ${p.nama}`}>
+                          {p.sideQuest.kategori.map((k) => (
+                            <li
+                              key={k.kategori}
+                              className={`rounded-full border px-2 py-0.5 text-xs ${
+                                k.total > 0 && k.selesai >= k.total ? "border-success text-success" : "border-border text-muted"
+                              }`}
+                            >
+                              {labelSingkatKategori(k.kategori)} <b className="text-fg">{k.selesai}</b>/{k.total}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs">
                       <span className="text-muted">{p.posBerikut ? `Berikutnya: ${p.posBerikut.nama} (${tglPendek(p.posBerikut.mulai)})` : "Pos terakhir"}</span>
                       <Link href={`/magang/rapor/${p.id}`} className="font-semibold text-primary hover:underline">

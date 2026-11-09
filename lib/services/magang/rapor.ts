@@ -78,3 +78,12 @@ export function susunRapor(input: {
     jumlahPos: new Set(lalu.map((a) => a.posId)).size,
   };
 }
+
+// ── Side quest (9 Nov 2026) — sekolah: lihat ./sekolah.ts ────────────────────────────────────
+
+const SINGKAT_KATEGORI: Record<string, string> = { cs: "CS", desain: "Desain", marketing: "Marketing", lain: "Lainnya" };
+
+/** Label pendek kategori side quest untuk chip Minggu Ini: "cs" → "CS". */
+export function labelSingkatKategori(k: string): string {
+  return SINGKAT_KATEGORI[k] ?? k;
+}

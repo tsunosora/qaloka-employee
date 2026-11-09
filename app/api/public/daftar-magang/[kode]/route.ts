@@ -8,7 +8,7 @@ import { atMidnight, toYmd } from "@/lib/services/leave/service";
 import { checkPin, normalizePin } from "@/lib/services/portal/pin";
 import { pendaftaranSchema } from "@/lib/validators/magang";
 import { hariIni } from "@/lib/services/magang/layanan";
-import { bolehKirimPendaftaran, ipKlien, keadaanTautan } from "@/lib/services/magang/pendaftaran";
+import { bolehKirimPendaftaran, ipKlien, keadaanTautan, terapkanSekolahTautan } from "@/lib/services/magang/pendaftaran";
 
 type Ctx = { params: Promise<{ kode: string }> };
 
@@ -35,6 +35,8 @@ export const GET = route<Ctx>(async (_req, ctx) => {
   const { t } = r;
   return json({
     label: t.label,
+    /** Terisi = tautan khusus satu sekolah; formulir mengunci kolom sekolah. */
+    sekolah: t.sekolah,
     berlakuSampai: toYmd(t.berlakuSampai),
     mulaiMagang: t.mulaiMagang ? toYmd(t.mulaiMagang) : null,
     selesaiMagang: t.selesaiMagang ? toYmd(t.selesaiMagang) : null,
@@ -50,7 +52,8 @@ export const POST = route<Ctx>(async (req, ctx) => {
   const r = await tautanAktif(kode);
   if (r.galat) return r.galat;
 
-  const parsed = pendaftaranSchema.safeParse(await req.json().catch(() => null));
+  // Tautan khusus sekolah: sekolah kiriman diabaikan, dipakai sekolah tautan.
+  const parsed = pendaftaranSchema.safeParse(terapkanSekolahTautan(await req.json().catch(() => null), r.t.sekolah));
   if (!parsed.success) return badRequest(parsed.error.flatten());
   const d = parsed.data;
   const pin = normalizePin(d.pin);
@@ -70,6 +73,8 @@ export const POST = route<Ctx>(async (req, ctx) => {
       hp: d.hp,
       sekolah: d.sekolah,
       jurusan: d.jurusan,
+      guruPembimbing: d.guruPembimbing,
+      kontakGuru: d.kontakGuru,
       mulai: atMidnight(d.mulai),
       selesai: d.selesai ? atMidnight(d.selesai) : null,
       pinHash: await bcrypt.hash(pin, 10),

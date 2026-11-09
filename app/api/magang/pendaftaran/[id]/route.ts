@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
-import { toYmd } from "@/lib/services/leave/service";
 import { wajibBolehMenambah } from "@/lib/lisensi/penjaga";
 import { keputusanPendaftarSchema } from "@/lib/validators/magang";
-import { buatPesertaBaru } from "@/lib/services/magang/pendaftaran";
+import { buatPesertaBaru, dataPesertaDariPendaftar } from "@/lib/services/magang/pendaftaran";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -28,19 +27,7 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
 
   await wajibBolehMenambah("limit.employees");
   const hasil = await prisma.$transaction(async (tx) => {
-    const r = await buatPesertaBaru(
-      tx,
-      {
-        namaLengkap: p.namaLengkap,
-        panggilan: p.panggilan,
-        hp: p.hp,
-        sekolah: p.sekolah,
-        jurusan: p.jurusan,
-        mulai: toYmd(p.mulai),
-        selesai: p.selesai ? toYmd(p.selesai) : null,
-      },
-      { token: p.token, pinHash: p.pinHash }
-    );
+    const r = await buatPesertaBaru(tx, dataPesertaDariPendaftar(p), { token: p.token, pinHash: p.pinHash });
     await tx.magangPendaftar.update({ where: { id }, data: { status: "disetujui", employeeId: r.employee.id, diputusAt: new Date() } });
     return r;
   });

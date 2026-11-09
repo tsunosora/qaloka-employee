@@ -29,6 +29,7 @@ export const GET = route(async () => {
       deskripsi: p.deskripsi,
       durasiMinggu: p.durasiMinggu,
       kapasitas: p.kapasitas,
+      lokasi: p.lokasi,
       urutan: p.urutan,
       aktif: p.aktif,
       pembimbing: p.pembimbing,

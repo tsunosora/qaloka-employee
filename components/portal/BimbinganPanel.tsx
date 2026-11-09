@@ -7,6 +7,7 @@ import { Card, soft } from "@/components/portal/ui";
 import { Pesan, tglPendek } from "@/components/magang/ui";
 import { NilaiTugas, type TugasAdmin } from "@/components/magang/NilaiTugas";
 import { DaftarJurnalPerAnak, type JurnalAdmin } from "@/components/magang/DaftarJurnal";
+import { SideQuestBimbingan } from "@/components/portal/SideQuestBimbingan";
 
 type Anak = { pesertaId: number; nama: string; pos: string; mingguKe: number; dari: number };
 type Data =
@@ -52,7 +53,7 @@ export function BimbinganPanel({ token, ownerQuery }: { token: string; ownerQuer
 
   return (
     <div className="space-y-4">
-      {bacaSaja && <p className="text-xs text-muted">Mode owner — hanya pembimbingnya yang bisa menilai tugas & mengecek jurnal.</p>}
+      {bacaSaja && <p className="text-xs text-muted">Mode owner — hanya pembimbingnya yang bisa menilai tugas, mengecek jurnal & memutus side quest.</p>}
       {notice && <Pesan jenis="ok">{notice}</Pesan>}
 
       <Card title="Anak di posmu minggu ini">
@@ -117,6 +118,8 @@ export function BimbinganPanel({ token, ownerQuery }: { token: string; ownerQuer
           />
         )}
       </section>
+
+      <SideQuestBimbingan apiBase={apiBase} q={q} bacaSaja={bacaSaja} />
 
       {dinilai && (
         <NilaiTugas
