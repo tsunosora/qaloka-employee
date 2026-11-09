@@ -27,6 +27,13 @@ export async function keadaanPortal(req: Request, token: string): Promise<{
     magang: boolean;
     /** Karyawan ini pembimbing ≥1 pos magang aktif → tab Bimbingan tampil. */
     pembimbing: boolean;
+    /**
+     * Absen lewat HP menyala untuk karyawan ini DAN add-on hr.absen_hp termasuk lisensi → portal
+     * menampilkan tombol "Absen sekarang" ke /absen/<token> (sesi PIN yang sama, tanpa PIN ulang).
+     */
+    absenHp: boolean;
+    /** Portal /me termasuk lisensi (hr.portal) → halaman absen menautkan balik ke /me. */
+    portal: boolean;
   };
 }> {
   const employee = await requireEmployeeByToken(token);
@@ -40,6 +47,7 @@ export async function keadaanPortal(req: Request, token: string): Promise<{
   // Tanpa penanda itu, tautan yang sama berperilaku sama persis bagi siapa pun,
   // sehingga owner bisa memeriksa apa yang benar-benar dilihat karyawannya.
   const asManager = managerModeRequested(req) && (await viewerIsManager());
+  const lisensi = await fiturTampil(["hr.absen_hp", "hr.portal"]);
 
   return {
     employee,
@@ -58,6 +66,8 @@ export async function keadaanPortal(req: Request, token: string): Promise<{
       fitur: await fiturTampil(FITUR_TAB_PORTAL),
       magang: (await prisma.magangPeserta.count({ where: { employeeId: employee.id, aktif: true } })) > 0,
       pembimbing: (await prisma.magangPos.count({ where: { pembimbingId: employee.id, aktif: true, deletedAt: null } })) > 0,
+      absenHp: employee.absenHp && lisensi["hr.absen_hp"] !== false,
+      portal: lisensi["hr.portal"] !== false,
     },
   };
 }

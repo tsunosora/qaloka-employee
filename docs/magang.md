@@ -93,3 +93,26 @@ Simulasi penuh 13 minggu (laporan `D:\FAISAL\laporan-magang\`) menemukan 9 hal; 
 - Voliko memakai **Sabtu** (permintaan Faisal): `f1c2349` terdeploy 8 Nov 15.38 (skrip `~/alat/deploy-rms-haritugas-20261108.sh`),
   setelan dipasang 15.38.57 lewat `PUT /api/magang/setelan` sebagai admin (`~/alat/setel-hari-tugas-sabtu-20261108.sh`).
   Exindo tetap bawaan Jumat (belum dideploy).
+
+## Absen dari HP lewat halaman pribadi (9 Nov 2026)
+
+- Fitur absen HP (add-on `hr.absen_hp`: foto kamera depan diperkecil, GPS + akurasi ≤150 m, BANYAK lokasi dengan
+  radius per lokasi, satu HP per orang, opsional QR) SUDAH ADA sejak 13 Okt di `/absen/<token>` — dinyalakan PER
+  KARYAWAN di **Setelan → Absen HP**. Yang baru (`feat/absen-hp-portal`): halaman pribadi `/me/<token>` menampilkan
+  kartu **Absen masuk / pulang** di atas tab (untuk semua karyawan yang absen HP-nya menyala, termasuk peserta
+  magang; tidak tampil di mode owner) → membuka `/absen/<token>` dengan sesi PIN yang sama (tanpa PIN ulang);
+  halaman absen punya tombol **Halaman pribadi** kembali (hanya bila lisensi memuat `hr.portal`).
+- Absen HP = baris `Attendance` `machineName "hp"` + `AbsenHpBukti` (foto, titik, jarak, lokasi); masuk/pulang
+  ditetapkan `relabelDeviceScans()` bersama scan mesin Fingerspot → alur mesin tidak berubah. Di luar radius:
+  ditolak, atau (setelan `absen_hp_luar_lokasi`, bawaan boleh) jadi pengajuan yang menunggu persetujuan
+  (Absensi → Absen di luar lokasi). Foto bukti per tanggal: Setelan → Absen HP.
+- **Ringkasan/Absensi halaman pribadi** tidak lagi menghitung hari SEBELUM masa magang (`MagangPeserta.mulai`
+  paling awal; karyawan biasa: `joinDate`) sebagai tidak hadir — `lib/services/portal/awal-hitung.ts`,
+  tes `tests/portal-awal-hitung.test.ts`. Rekap dasbor admin belum memakai aturan ini.
+- Voliko (9 Nov): absen HP dinyalakan untuk 4 peserta (cadangan `~/cadangan/absen-hp-magang-20261109/`, skrip
+  `~/alat/nyalakan-absen-hp-magang-20261109.sh`). Lokasi terdaftar: **Toko Pusat** (radius 100 m, dari 18 Okt).
+  Lokasi cabang BELUM: tidak ada koordinat sah di sistem (`company_branches` POS: Imogiri & Sewon tanpa
+  lat/lng) → Faisal menambahkannya di Setelan → Absen HP → *Lokasi saya* sambil berdiri di cabang.
+- **Terdeploy ke Voliko 9 Nov 11.01** (`509e919`, skrip `~/alat/deploy-rms-absenportal-20261109.sh`, log `.log` di
+  sebelahnya, cadangan `~/cadangan/deploy-rms-20261109-110118/`). Diperiksa: `/me`, `/absen`, portal API 200;
+  peserta mendapat `absenHp: true`; poller Fingerspot tetap jalan.
