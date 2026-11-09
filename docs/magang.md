@@ -116,3 +116,9 @@ Simulasi penuh 13 minggu (laporan `D:\FAISAL\laporan-magang\`) menemukan 9 hal; 
 - **Terdeploy ke Voliko 9 Nov 11.01** (`509e919`, skrip `~/alat/deploy-rms-absenportal-20261109.sh`, log `.log` di
   sebelahnya, cadangan `~/cadangan/deploy-rms-20261109-110118/`). Diperiksa: `/me`, `/absen`, portal API 200;
   peserta mendapat `absenHp: true`; poller Fingerspot tetap jalan.
+- **Perbaikan foto + log penolakan terdeploy 9 Nov 11.23** (`f77dedb`, `fix/absen-hp-foto`; skrip
+  `~/alat/deploy-rms-absenfoto-20261109.sh`, cadangan `~/cadangan/deploy-rms-20261109-112304/`). Pemicu: Yufita "foto tidak
+  diterima" tanpa jejak apa pun di server. Foto kini diperkecil lewat 3 jalan (bitmap → `<img>` → berkas asli ≤6 MB); HEIC,
+  foto besar & sesi PIN habis punya pesan sendiri. **Penolakan tercatat** di `~/.pm2/logs/ratemystaff-error-12.log`
+  (`grep "absen-hp] TOLAK"`: karyawan, kode, jarak, akurasi, ukuran/jenis foto — tanpa koordinat/token). Diuji di
+  produksi dengan kiriman id-perangkat tak sah (tercatat, tidak ada yang ditulis). Lokasi aktif: Voliko Pusat & Voliko Cabang.
