@@ -38,13 +38,59 @@ export function ipKlien(req: Request): string {
   return req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "lokal";
 }
 
+/**
+ * Tautan khusus satu sekolah/rombongan (`MagangDaftar.sekolah` terisi): sekolah dari tautan yang
+ * dipakai, apa pun yang dikirim formulir — pendaftar tidak bisa "pindah" sekolah lewat tautan itu.
+ * Dipanggil SEBELUM validasi supaya kiriman tanpa sekolah tetap lolos di tautan khusus.
+ */
+export function terapkanSekolahTautan(kiriman: unknown, sekolahTautan: string | null | undefined): unknown {
+  const s = sekolahTautan?.trim();
+  if (!s) return kiriman;
+  const obj = kiriman && typeof kiriman === "object" && !Array.isArray(kiriman) ? (kiriman as Record<string, unknown>) : {};
+  return { ...obj, sekolah: s };
+}
+
+export type DataPesertaBaru = {
+  namaLengkap: string;
+  panggilan: string | null;
+  hp: string | null;
+  sekolah: string | null;
+  jurusan: string | null;
+  guruPembimbing?: string | null;
+  kontakGuru?: string | null;
+  mulai: string;
+  selesai?: string | null;
+  catatan?: string | null;
+};
+
+/** Pendaftar yang disetujui → data peserta (sekolah + guru pembimbing sekolah ikut tersalin). */
+export function dataPesertaDariPendaftar(p: {
+  namaLengkap: string;
+  panggilan: string | null;
+  hp: string | null;
+  sekolah: string | null;
+  jurusan: string | null;
+  guruPembimbing: string | null;
+  kontakGuru: string | null;
+  mulai: Date;
+  selesai: Date | null;
+}): DataPesertaBaru {
+  return {
+    namaLengkap: p.namaLengkap,
+    panggilan: p.panggilan,
+    hp: p.hp,
+    sekolah: p.sekolah,
+    jurusan: p.jurusan,
+    guruPembimbing: p.guruPembimbing,
+    kontakGuru: p.kontakGuru,
+    mulai: toYmd(p.mulai),
+    selesai: p.selesai ? toYmd(p.selesai) : null,
+  };
+}
+
 type Db = PrismaClient | Prisma.TransactionClient;
 
-export async function buatPesertaBaru(
-  db: Db,
-  d: { namaLengkap: string; panggilan: string | null; hp: string | null; sekolah: string | null; jurusan: string | null; mulai: string; selesai?: string | null; catatan?: string | null },
-  pin?: { token: string; pinHash: string }
-) {
+export async function buatPesertaBaru(db: Db, d: DataPesertaBaru, pin?: { token: string; pinHash: string }) {
   const employee = await db.employee.create({
     data: {
       employeeCode: await nextEmployeeCode(db as PrismaClient, d.panggilan || d.namaLengkap),
@@ -61,6 +107,8 @@ export async function buatPesertaBaru(
       employeeId: employee.id,
       sekolah: d.sekolah,
       jurusan: d.jurusan,
+      guruPembimbing: d.guruPembimbing ?? null,
+      kontakGuru: d.kontakGuru ?? null,
       mulai: atMidnight(d.mulai),
       selesai: d.selesai ? atMidnight(d.selesai) : null,
       catatan: d.catatan ?? null,

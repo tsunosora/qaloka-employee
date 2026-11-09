@@ -23,7 +23,7 @@ export const GET = route(async () => {
     prisma.magangPos.findMany({
       where: { deletedAt: null },
       orderBy: [{ urutan: "asc" }, { id: "asc" }],
-      select: { id: true, nama: true, durasiMinggu: true, aktif: true },
+      select: { id: true, nama: true, durasiMinggu: true, kapasitas: true, lokasi: true, aktif: true },
     }),
   ]);
   return json({
@@ -35,6 +35,7 @@ export const GET = route(async () => {
       mulai: toYmd(p.mulai),
       selesai: p.selesai ? toYmd(p.selesai) : null,
       aktif: p.aktif,
+      sekolah: p.sekolah,
       penugasan: p.penugasan.map(keYmd),
     })),
   });
@@ -47,5 +48,6 @@ export const POST = route(async (req: Request) => {
   if (!parsed.success) return badRequest(parsed.error.flatten());
   const pos = await prisma.magangPos.count({ where: { aktif: true, deletedAt: null } });
   if (pos === 0) return badRequest({ dari: ["Belum ada pos kerja aktif. Tambahkan pos dulu."] });
-  return json(await susunUlang(prisma, parsed.data.dari));
+  const { dari, mode, pesertaIds } = parsed.data;
+  return json(await susunUlang(prisma, dari, { mode, pesertaIds }));
 });

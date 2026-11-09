@@ -6,15 +6,36 @@ import { IconAlert, IconCheck, IconCopy } from "@/components/ui/icons";
 import { PinStrengthMeter } from "@/components/portal/PinStrengthMeter";
 import { longDate, soft } from "@/components/portal/ui";
 
-type Info = { label: string; berlakuSampai: string; mulaiMagang: string | null; selesaiMagang: string | null };
-type Form = { namaLengkap: string; panggilan: string; hp: string; sekolah: string; jurusan: string; mulai: string; selesai: string; pin: string; confirm: string };
+/** `sekolah` terisi = tautan khusus satu sekolah: kolom sekolah terkunci (server juga memakai sekolah tautan). */
+type Info = { label: string; sekolah: string | null; berlakuSampai: string; mulaiMagang: string | null; selesaiMagang: string | null };
+type Form = {
+  namaLengkap: string;
+  panggilan: string;
+  hp: string;
+  sekolah: string;
+  jurusan: string;
+  guruPembimbing: string;
+  kontakGuru: string;
+  mulai: string;
+  selesai: string;
+  pin: string;
+  confirm: string;
+};
 
 /** PUBLIK — anak magang mendaftar sendiri lewat tautan dari pengawas. Hasilnya menunggu persetujuan. */
 export default function DaftarMagangPage({ params }: { params: Promise<{ kode: string }> }) {
   const { kode } = use(params);
   const [info, setInfo] = useState<Info | null>(null);
   const [galatMuat, setGalatMuat] = useState("");
-  const [form, setForm] = useState<Form>({ namaLengkap: "", panggilan: "", hp: "", sekolah: "", jurusan: "", mulai: "", selesai: "", pin: "", confirm: "" });
+  const [form, setForm] = useState<Form>({
+    namaLengkap: "",
+    panggilan: "",
+    hp: "",
+    sekolah: "",
+    jurusan: "",
+    guruPembimbing: "",
+    kontakGuru: "",
+    mulai: "", selesai: "", pin: "", confirm: "" });
   const [busy, setBusy] = useState(false);
   const [galat, setGalat] = useState("");
   const [selesai, setSelesai] = useState<{ token: string; nama: string } | null>(null);
@@ -26,7 +47,7 @@ export default function DaftarMagangPage({ params }: { params: Promise<{ kode: s
       (d) => {
         if (!hidup) return;
         setInfo(d);
-        setForm((f) => ({ ...f, mulai: d.mulaiMagang ?? "", selesai: d.selesaiMagang ?? "" }));
+        setForm((f) => ({ ...f, sekolah: d.sekolah ?? f.sekolah, mulai: d.mulaiMagang ?? "", selesai: d.selesaiMagang ?? "" }));
       },
       (e) => hidup && setGalatMuat(e instanceof Error ? e.message : "Tautan tidak bisa dibuka.")
     );
@@ -47,7 +68,14 @@ export default function DaftarMagangPage({ params }: { params: Promise<{ kode: s
     try {
       const r = await api<{ token: string; nama: string }>(`/api/public/daftar-magang/${kode}`, {
         method: "POST",
-        body: JSON.stringify({ ...form, selesai: form.selesai || null, panggilan: form.panggilan || null, jurusan: form.jurusan || null }),
+        body: JSON.stringify({
+          ...form,
+          selesai: form.selesai || null,
+          panggilan: form.panggilan || null,
+          jurusan: form.jurusan || null,
+          guruPembimbing: form.guruPembimbing.trim() || null,
+          kontakGuru: form.kontakGuru.trim() || null,
+        }),
       });
       setSelesai(r);
     } catch (err) {
@@ -85,7 +113,7 @@ export default function DaftarMagangPage({ params }: { params: Promise<{ kode: s
               <p className="break-all text-sm font-semibold text-fg">{tautanHp}</p>
               <button
                 type="button"
-                className="btn-ghost mt-2 h-9 text-xs"
+                className="btn-ghost mt-2 h-11 text-xs"
                 onClick={() => navigator.clipboard.writeText(tautanHp).then(() => setDisalin(true), () => undefined)}
               >
                 <IconCopy /> {disalin ? "Tersalin" : "Salin tautan"}
@@ -109,11 +137,23 @@ export default function DaftarMagangPage({ params }: { params: Promise<{ kode: s
             <Medan label="Nomor HP / WhatsApp" wajib>
               <input className="input" value={form.hp} onChange={ubah("hp")} inputMode="tel" maxLength={20} autoComplete="tel" placeholder="08…" />
             </Medan>
-            <Medan label="Sekolah / kampus" wajib>
-              <input className="input" value={form.sekolah} onChange={ubah("sekolah")} maxLength={150} />
-            </Medan>
+            {info.sekolah ? (
+              <Medan label="Sekolah / kampus" bantu="Sudah diisi dari tautan ini — tidak perlu diubah.">
+                <input className="input cursor-not-allowed border-dashed bg-surface-2 font-semibold" value={info.sekolah} readOnly aria-readonly />
+              </Medan>
+            ) : (
+              <Medan label="Sekolah / kampus" wajib>
+                <input className="input" value={form.sekolah} onChange={ubah("sekolah")} maxLength={150} />
+              </Medan>
+            )}
             <Medan label="Jurusan">
               <input className="input" value={form.jurusan} onChange={ubah("jurusan")} maxLength={100} />
+            </Medan>
+            <Medan label="Guru pembimbing dari sekolah" bantu="Boleh dikosongkan.">
+              <input className="input" value={form.guruPembimbing} onChange={ubah("guruPembimbing")} maxLength={150} />
+            </Medan>
+            <Medan label="Nomor HP / WA guru pembimbing" bantu="Boleh dikosongkan.">
+              <input className="input" value={form.kontakGuru} onChange={ubah("kontakGuru")} inputMode="tel" maxLength={60} />
             </Medan>
             <div className="grid grid-cols-2 gap-3">
               <Medan label="Mulai magang" wajib>
@@ -165,13 +205,14 @@ export default function DaftarMagangPage({ params }: { params: Promise<{ kode: s
   );
 }
 
-function Medan({ label, wajib, children }: { label: string; wajib?: boolean; children: React.ReactNode }) {
+function Medan({ label, wajib, bantu, children }: { label: string; wajib?: boolean; bantu?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="text-sm font-semibold text-fg">
         {label} {wajib && <span className="text-danger" aria-hidden>*</span>}
       </span>
       <div className="mt-1.5">{children}</div>
+      {bantu && <span className="mt-1 block text-xs text-muted">{bantu}</span>}
     </label>
   );
 }

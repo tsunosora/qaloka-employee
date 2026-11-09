@@ -5,12 +5,15 @@ import { api } from "@/lib/fetcher";
 import { Modal } from "@/components/ui/Modal";
 import { IconCheck, IconCopy, IconPlus, IconX } from "@/components/ui/icons";
 import { longDate } from "@/components/portal/ui";
+import { daftarSekolah } from "@/lib/services/magang/sekolah";
 import { tglPendek } from "./ui";
 
 type Tautan = {
   id: number;
   kode: string;
   label: string;
+  /** Terisi = tautan khusus satu sekolah/rombongan (kolom sekolah di formulir terkunci). */
+  sekolah: string | null;
   berlakuSampai: string;
   mulaiMagang: string | null;
   selesaiMagang: string | null;
@@ -24,6 +27,8 @@ type Pendaftar = {
   hp: string | null;
   sekolah: string | null;
   jurusan: string | null;
+  guruPembimbing: string | null;
+  kontakGuru: string | null;
   mulai: string;
   selesai: string | null;
   status: string;
@@ -43,9 +48,20 @@ function tambahHari(ymd: string, n: number): string {
  * Pendaftaran mandiri: tautan pendaftaran (dibagikan pengawas) + pendaftar yang menunggu persetujuan.
  * `onBerubah` dipanggil sesudah ada yang disetujui (daftar peserta di halaman induk perlu dimuat ulang).
  */
-export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; onBerubah: () => void; onPesan: (ok: boolean, teks: string) => void }) {
+export function Pendaftaran({
+  hariIni,
+  onBerubah,
+  onPesan,
+  sekolahPeserta = [],
+}: {
+  hariIni: string;
+  onBerubah: () => void;
+  onPesan: (ok: boolean, teks: string) => void;
+  /** Sekolah peserta yang sudah ada — saran isian "Khusus sekolah" supaya tulisannya seragam. */
+  sekolahPeserta?: readonly (string | null)[];
+}) {
   const [data, setData] = useState<Payload | null>(null);
-  const [buat, setBuat] = useState<{ label: string; berlakuSampai: string; mulaiMagang: string; selesaiMagang: string } | null>(null);
+  const [buat, setBuat] = useState<{ label: string; sekolah: string; berlakuSampai: string; mulaiMagang: string; selesaiMagang: string } | null>(null);
   const [tolak, setTolak] = useState<{ p: Pendaftar; alasan: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -86,6 +102,7 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
   if (!data) return null;
   const aktif = data.tautan.filter((t) => t.keadaan === "aktif");
   const lain = data.tautan.filter((t) => t.keadaan !== "aktif").slice(0, 5);
+  const saranSekolah = daftarSekolah([...sekolahPeserta, ...data.menunggu.map((p) => p.sekolah), ...data.tautan.map((t) => t.sekolah)]);
 
   return (
     <>
@@ -104,16 +121,22 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
                   <p className="text-sm text-muted">
                     {[p.sekolah, p.jurusan].filter(Boolean).join(" · ")} · HP {p.hp} · {longDate(p.mulai)} – {p.selesai ? longDate(p.selesai) : "?"}
                   </p>
+                  {p.guruPembimbing && (
+                    <p className="text-xs text-muted">
+                      Guru pembimbing: {p.guruPembimbing}
+                      {p.kontakGuru && ` · ${p.kontakGuru}`}
+                    </p>
+                  )}
                   <p className="text-xs text-subtle">
                     Mendaftar {new Date(p.dikirimAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })} lewat “{p.tautan}”
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button className="btn-ghost h-9 text-xs text-danger" disabled={busy} onClick={() => setTolak({ p, alasan: "" })}>
+                  <button className="btn-ghost h-11 text-xs text-danger" disabled={busy} onClick={() => setTolak({ p, alasan: "" })}>
                     <IconX /> Tolak
                   </button>
                   <button
-                    className="btn-primary h-9 text-xs"
+                    className="btn-primary h-11 text-xs"
                     disabled={busy}
                     onClick={() =>
                       jalankan(
@@ -142,8 +165,8 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
             </p>
           </div>
           <button
-            className="btn-ghost h-9 text-xs"
-            onClick={() => setBuat({ label: "", berlakuSampai: tambahHari(hariIni, 14), mulaiMagang: "", selesaiMagang: "" })}
+            className="btn-ghost h-11 text-xs"
+            onClick={() => setBuat({ label: "", sekolah: "", berlakuSampai: tambahHari(hariIni, 14), mulaiMagang: "", selesaiMagang: "" })}
           >
             <IconPlus /> Buat tautan
           </button>
@@ -153,7 +176,10 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
             {[...aktif, ...lain].map((t) => (
               <li key={t.id} className={`flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 p-3 text-sm ${t.keadaan === "aktif" ? "" : "opacity-60"}`}>
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-fg">{t.label}</p>
+                  <p className="font-semibold text-fg">
+                    {t.label}
+                    {t.sekolah && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Khusus {t.sekolah}</span>}
+                  </p>
                   <p className="text-xs text-muted">
                     {t.keadaan === "aktif" ? `Berlaku s.d. ${tglPendek(t.berlakuSampai)}` : t.keadaan === "kedaluwarsa" ? "Kedaluwarsa" : "Ditutup"} · {t.jumlahPendaftar} pendaftar
                     {t.mulaiMagang && ` · magang ${tglPendek(t.mulaiMagang)}${t.selesaiMagang ? `–${tglPendek(t.selesaiMagang)}` : ""}`}
@@ -161,11 +187,11 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
                 </div>
                 {t.keadaan === "aktif" && (
                   <>
-                    <button className="btn-ghost h-8 px-3 text-xs" onClick={() => salin(t.kode)}>
+                    <button className="btn-ghost h-11 px-3 text-xs" onClick={() => salin(t.kode)}>
                       <IconCopy /> Salin tautan
                     </button>
                     <button
-                      className="btn-ghost h-8 px-3 text-xs text-danger"
+                      className="btn-ghost h-11 px-3 text-xs text-danger"
                       disabled={busy}
                       onClick={() =>
                         confirm(`Tutup tautan "${t.label}"? Pendaftar yang sudah masuk tetap ada.`) &&
@@ -209,6 +235,25 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
               <span className="mt-1 block text-xs text-muted">Tampil di atas formulir pendaftaran.</span>
             </label>
             <label className="block">
+              <span className="text-sm font-semibold text-fg">Khusus sekolah (opsional)</span>
+              <input
+                className="input mt-1.5"
+                value={buat.sekolah}
+                maxLength={150}
+                list="saran-sekolah-tautan"
+                placeholder="Kosongkan bila untuk semua sekolah"
+                onChange={(e) => setBuat({ ...buat, sekolah: e.target.value })}
+              />
+              <datalist id="saran-sekolah-tautan">
+                {saranSekolah.map((s) => (
+                  <option key={s.kunci} value={s.label} />
+                ))}
+              </datalist>
+              <span className="mt-1 block text-xs text-muted">
+                Bila diisi, semua yang mendaftar lewat tautan ini otomatis tercatat dari sekolah ini dan tidak bisa mengubahnya. Cocok untuk satu rombongan.
+              </span>
+            </label>
+            <label className="block">
               <span className="text-sm font-semibold text-fg">Tautan berlaku sampai</span>
               <input type="date" className="input mt-1.5" value={buat.berlakuSampai} min={hariIni} onChange={(e) => setBuat({ ...buat, berlakuSampai: e.target.value })} />
             </label>
@@ -229,18 +274,23 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <button className="btn-ghost h-10 text-sm" onClick={() => setBuat(null)}>
+              <button className="btn-ghost h-11 text-sm" onClick={() => setBuat(null)}>
                 Batal
               </button>
               <button
-                className="btn-primary h-10 text-sm"
+                className="btn-primary h-11 text-sm"
                 disabled={busy || buat.label.trim().length < 2 || !buat.berlakuSampai}
                 onClick={async () => {
                   const ok = await jalankan(
                     () =>
                       api("/api/magang/pendaftaran", {
                         method: "POST",
-                        body: JSON.stringify({ ...buat, mulaiMagang: buat.mulaiMagang || null, selesaiMagang: buat.selesaiMagang || null }),
+                        body: JSON.stringify({
+                          ...buat,
+                          sekolah: buat.sekolah.trim() || null,
+                          mulaiMagang: buat.mulaiMagang || null,
+                          selesaiMagang: buat.selesaiMagang || null,
+                        }),
                       }),
                     "Tautan pendaftaran dibuat. Tekan Salin tautan untuk membagikannya."
                   );
@@ -262,11 +312,11 @@ export function Pendaftaran({ hariIni, onBerubah, onPesan }: { hariIni: string; 
               <input className="input mt-1.5" value={tolak.alasan} maxLength={255} onChange={(e) => setTolak({ ...tolak, alasan: e.target.value })} />
             </label>
             <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <button className="btn-ghost h-10 text-sm" onClick={() => setTolak(null)}>
+              <button className="btn-ghost h-11 text-sm" onClick={() => setTolak(null)}>
                 Batal
               </button>
               <button
-                className="btn-primary h-10 text-sm"
+                className="btn-primary h-11 text-sm"
                 disabled={busy || !tolak.alasan.trim()}
                 onClick={async () => {
                   const ok = await jalankan(

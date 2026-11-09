@@ -18,6 +18,8 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
     data: {
       sekolah: d.sekolah,
       jurusan: d.jurusan,
+      guruPembimbing: d.guruPembimbing,
+      kontakGuru: d.kontakGuru,
       mulai: atMidnight(d.mulai),
       selesai: d.selesai ? atMidnight(d.selesai) : null,
       aktif: d.aktif,

@@ -8,6 +8,8 @@ import { seninDari } from "@/lib/services/magang/rotasi";
 import { susunRapor } from "@/lib/services/magang/rapor";
 import { namaUsaha } from "@/lib/services/upah/data";
 import { namaPengurus } from "@/lib/services/magang/pembimbing";
+import { progresPeserta } from "@/lib/services/magang/misi-db";
+import { labelKategori } from "@/lib/services/magang/misi";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -40,12 +42,19 @@ export const GET = route<Ctx>(async (_req, ctx) => {
   const mulai = toYmd(p.mulai);
   const hari = hariIni();
   const sampai = p.selesai && toYmd(p.selesai) < hari ? toYmd(p.selesai) : hari;
-  const [libur, jurnalBaris] = await Promise.all([
+  const [libur, jurnalBaris, progres, misiSelesai] = await Promise.all([
     sampai >= mulai ? prisma.holiday.findMany({ where: { date: { gte: atMidnight(mulai), lte: atMidnight(sampai) } }, select: { date: true } }) : [],
     prisma.magangJurnal.findMany({
       where: { pesertaId: p.id },
       orderBy: { tanggal: "desc" },
       include: { pos: { select: { nama: true } }, dicekOleh: { select: { name: true } }, dicekOlehKaryawan: { select: { fullName: true, nickname: true } } },
+    }),
+    progresPeserta(prisma, [p.id]),
+    // Semua misi yang PERNAH disetujui (termasuk misi yang kemudian dinonaktifkan/dihapus — hasil kerja tetap tercatat).
+    prisma.magangMisiKiriman.findMany({
+      where: { pesertaId: p.id, status: "disetujui" },
+      orderBy: { diputusAt: "asc" },
+      select: { id: true, diputusAt: true, misi: { select: { judul: true, kategori: true, poin: true } } },
     }),
   ]);
   const hariKerjaList = sampai >= mulai ? hariKerja(mulai, sampai, new Set(libur.map((l) => toYmd(l.date)))) : [];
@@ -67,11 +76,25 @@ export const GET = route<Ctx>(async (_req, ctx) => {
       panggilan: p.employee.nickname,
       sekolah: p.sekolah,
       jurusan: p.jurusan,
+      guruPembimbing: p.guruPembimbing,
+      kontakGuru: p.kontakGuru,
       mulai: toYmd(p.mulai),
       selesai: p.selesai ? toYmd(p.selesai) : null,
       catatan: p.catatan,
     },
     rapor: { ...rapor, baris: rapor.baris.map((b) => ({ ...b, ...(infoPos.get(b.posId) ?? { deskripsi: null, pembimbing: null }) })) },
     tugas,
+    // Side quest: pelengkap rapor, TIDAK mengubah nilai akhir. Progres hanya menghitung misi yang sedang aktif.
+    sideQuest: {
+      progres: progres.get(p.id) ?? null,
+      disetujui: misiSelesai.map((k) => ({
+        id: k.id,
+        judul: k.misi.judul,
+        kategori: k.misi.kategori,
+        kategoriLabel: labelKategori(k.misi.kategori),
+        poin: k.misi.poin,
+        tanggal: k.diputusAt ? toYmd(k.diputusAt) : null,
+      })),
+    },
   });
 });

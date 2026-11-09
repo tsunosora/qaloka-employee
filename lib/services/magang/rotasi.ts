@@ -9,6 +9,9 @@
  *   penuh, anak tetap ditaruh di pos yang paling sedikit isinya dan ditandai `berbagi` —
  *   anak tidak pernah dibiarkan tanpa pos.
  * - Anak yang masuk di tengah jalan ikut disusun mulai minggu masuknya.
+ * - `hanya` (9 Nov 2026, rombongan baru dari sekolah lain): HANYA anak-anak itu yang disusun; jadwal
+ *   anak lain (boleh juga yang sesudah `dari`) dikirim lewat `ada` dan dihitung sebagai isi pos,
+ *   jadi tidak ada penugasan berjalan yang teracak dan kapasitas pos tetap dihormati.
  *
  * Satuan waktu = MINGGU yang dimulai Senin, ditulis "YYYY-MM-DD" (tanggal Seninnya).
  */
@@ -83,6 +86,8 @@ export function susunRotasi(input: {
   peserta: readonly PesertaRotasi[];
   ada: readonly PenugasanAda[];
   dari: string;
+  /** Bila diisi: hanya peserta ini yang disusun (lainnya cukup mengisi pos lewat `ada`). */
+  hanya?: readonly number[];
 }): PenugasanBaru[] {
   const dari = seninDari(input.dari);
   const pos = input.pos.filter((p) => p.durasiMinggu >= 1);
@@ -111,7 +116,8 @@ export function susunRotasi(input: {
   }
 
   const peserta = [...input.peserta].sort((a, b) => a.id - b.id);
-  const akhirSemua = peserta.reduce((maks, p) => {
+  const hanya = input.hanya ? new Set(input.hanya) : null;
+  const akhirSemua = peserta.filter((p) => !hanya || hanya.has(p.id)).reduce((maks, p) => {
     const t = seninTerakhir(p, dari);
     return t > maks ? t : maks;
   }, dari);
@@ -121,6 +127,7 @@ export function susunRotasi(input: {
   for (let w = 0; w < jumlahMinggu; w++) {
     const senin = tambahMinggu(dari, w);
     peserta.forEach((p, urutan) => {
+      if (hanya && !hanya.has(p.id)) return; // jadwalnya tetap (hanya mengisi pos)
       if (seninDari(p.mulai) > senin) return; // belum masuk
       const terakhir = seninTerakhir(p, dari);
       if (senin > terakhir) return; // sudah selesai

@@ -4,15 +4,19 @@ import { atMidnight, toYmd } from "@/lib/services/leave/service";
 import { hariIni, hariTugasMagang, keYmd } from "@/lib/services/magang/layanan";
 import { seninDari, tambahMinggu, penugasanPada, mingguKe } from "@/lib/services/magang/rotasi";
 import { keadaanJendela } from "@/lib/services/magang/nilai";
+import { progresPeserta } from "@/lib/services/magang/misi-db";
 
-/** Ringkasan halaman Magang: tiap anak aktif, posnya minggu ini, status tugas minggu ini & lalu. */
+/**
+ * Ringkasan halaman Magang: tiap anak aktif, posnya minggu ini, status tugas minggu ini & lalu,
+ * sekolah, progres side quest per kategori, dan jumlah bukti side quest yang menunggu diperiksa.
+ */
 export const GET = route(async () => {
   await requireManager();
   const hari = hariIni();
   const seninIni = seninDari(hari);
   const seninLalu = tambahMinggu(seninIni, -1);
 
-  const [peserta, pos, belumDinilai, jumlahPos, hariTugas] = await Promise.all([
+  const [peserta, pos, belumDinilai, jumlahPos, hariTugas, misiMenunggu] = await Promise.all([
     prisma.magangPeserta.findMany({
       where: { aktif: true, employee: { deletedAt: null, isActive: true } },
       orderBy: { id: "asc" },
@@ -27,7 +31,12 @@ export const GET = route(async () => {
     prisma.magangTugas.count({ where: { dinilaiAt: null, peserta: { aktif: true, employee: { deletedAt: null } } } }),
     prisma.magangPos.count({ where: { aktif: true, deletedAt: null } }),
     hariTugasMagang(prisma),
+    // Sama dengan antrean /magang/misi: hanya peserta aktif & misi yang belum dihapus.
+    prisma.magangMisiKiriman.count({
+      where: { status: "menunggu", misi: { deletedAt: null }, peserta: { aktif: true, employee: { deletedAt: null } } },
+    }),
   ]);
+  const progres = await progresPeserta(prisma, peserta.map((p) => p.id));
   const posMap = new Map(pos.map((p) => [p.id, p]));
 
   const statusTugas = (t: { nilai: number | null; dinilaiAt: Date | null } | undefined, senin: string, adaPenugasan: boolean) => {
@@ -43,6 +52,7 @@ export const GET = route(async () => {
     hariTugas,
     jumlahPos,
     belumDinilai,
+    misiMenunggu,
     peserta: peserta.map((p) => {
       const pen = p.penugasan.map(keYmd);
       const ini = penugasanPada(pen, seninIni);
@@ -54,6 +64,7 @@ export const GET = route(async () => {
         id: p.id,
         nama: p.employee.nickname || p.employee.fullName,
         namaLengkap: p.employee.fullName,
+        sekolah: p.sekolah,
         publicToken: p.employee.publicToken,
         mulai: toYmd(p.mulai),
         selesai: p.selesai ? toYmd(p.selesai) : null,
@@ -72,6 +83,12 @@ export const GET = route(async () => {
         rataNilai: nilai.length ? Math.round(nilai.reduce((s, n) => s + n, 0) / nilai.length) : null,
         adaRotasi: pen.length > 0,
         jurnalHariIni: p.jurnal.length > 0,
+        sideQuest: (() => {
+          const g = progres.get(p.id);
+          return g
+            ? { kategori: g.kategori.map((k) => ({ kategori: k.kategori, selesai: k.selesai, total: k.total })), menunggu: g.menunggu, selesai: g.selesai, total: g.total }
+            : null;
+        })(),
       };
     }),
   });

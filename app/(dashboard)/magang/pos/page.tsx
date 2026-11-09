@@ -13,6 +13,7 @@ type Pos = {
   deskripsi: string | null;
   durasiMinggu: number;
   kapasitas: number;
+  lokasi: string | null;
   urutan: number;
   aktif: boolean;
   pembimbing: { id: number; fullName: string } | null;
@@ -20,7 +21,17 @@ type Pos = {
 };
 type Payload = { pos: Pos[]; karyawan: { id: number; fullName: string }[] };
 
-type FormPos = { id?: number; nama: string; deskripsi: string; durasiMinggu: number; kapasitas: number; urutan: number; pembimbingId: string; aktif: boolean };
+type FormPos = {
+  id?: number;
+  nama: string;
+  deskripsi: string;
+  durasiMinggu: number;
+  kapasitas: number;
+  lokasi: string;
+  urutan: number;
+  pembimbingId: string;
+  aktif: boolean;
+};
 type FormSoal = { id?: number; posId: number; pertanyaan: string; pilihan: string[]; benar: number; aktif: boolean };
 
 export default function PosMagangPage() {
@@ -64,7 +75,12 @@ export default function PosMagangPage() {
 
   async function simpanPos() {
     if (!formPos) return;
-    const body = JSON.stringify({ ...formPos, id: undefined, pembimbingId: formPos.pembimbingId ? Number(formPos.pembimbingId) : null });
+    const body = JSON.stringify({
+      ...formPos,
+      id: undefined,
+      lokasi: formPos.lokasi.trim() || null,
+      pembimbingId: formPos.pembimbingId ? Number(formPos.pembimbingId) : null,
+    });
     const ok = await jalankan(
       () => api(formPos.id ? `/api/magang/pos/${formPos.id}` : "/api/magang/pos", { method: formPos.id ? "PATCH" : "POST", body }),
       `Pos "${formPos.nama}" tersimpan.`
@@ -82,7 +98,7 @@ export default function PosMagangPage() {
     if (ok) setFormSoal(null);
   }
 
-  const posBaru = (): FormPos => ({ nama: "", deskripsi: "", durasiMinggu: 1, kapasitas: 1, urutan: (data?.pos.length ?? 0) + 1, pembimbingId: "", aktif: true });
+  const posBaru = (): FormPos => ({ nama: "", deskripsi: "", durasiMinggu: 1, kapasitas: 1, lokasi: "", urutan: (data?.pos.length ?? 0) + 1, pembimbingId: "", aktif: true });
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -90,7 +106,7 @@ export default function PosMagangPage() {
         judul="Pos Kerja & Bank Soal"
         keterangan="Pos yang dirotasi ke anak magang. Pos berat (perlu latihan tangan/alat) sebaiknya 2 minggu: minggu 1 didampingi, minggu 2 mandiri. Pos ringan cukup 1 minggu. Tiap pos punya bank soal; tiap akhir minggu (hari tugas mengingat, atur di Minggu Ini) anak mendapat sampai 5 soal acak dari pos yang dia pegang — isi minimal 5 soal per pos."
         aksi={
-          <button onClick={() => setFormPos(posBaru())} className="btn-primary h-10 text-sm" disabled={!data}>
+          <button onClick={() => setFormPos(posBaru())} className="btn-primary h-11 text-sm" disabled={!data}>
             <IconPlus className="text-[16px]" /> Tambah pos
           </button>
         }
@@ -108,13 +124,13 @@ export default function PosMagangPage() {
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button
-              className="btn-primary h-10 text-sm"
+              className="btn-primary h-11 text-sm"
               disabled={busy}
               onClick={() => jalankan(() => api("/api/magang/pos/contoh", { method: "POST" }), "Contoh pos percetakan dipasang. Sunting sesuai tempat kerja.")}
             >
               Pakai contoh pos percetakan
             </button>
-            <button className="btn-ghost h-10 text-sm" onClick={() => setFormPos(posBaru())}>
+            <button className="btn-ghost h-11 text-sm" onClick={() => setFormPos(posBaru())}>
               Buat sendiri
             </button>
           </div>
@@ -129,7 +145,9 @@ export default function PosMagangPage() {
                   <span className="mt-1.5 h-3 w-3 shrink-0 rounded-full" style={{ background: warnaPos(i) }} aria-hidden />
                   <div className="min-w-0 flex-1">
                     <h2 className="font-display font-bold text-fg">
-                      {p.nama} {!p.aktif && <span className="text-xs font-normal text-subtle">(nonaktif — tidak ikut rotasi)</span>}
+                      {p.nama}{" "}
+                      {p.lokasi && <span className="ml-1 rounded-full bg-surface-2 px-2 py-0.5 align-middle text-xs font-semibold text-muted">{p.lokasi}</span>}{" "}
+                      {!p.aktif && <span className="text-xs font-normal text-subtle">(nonaktif — tidak ikut rotasi)</span>}
                     </h2>
                     <p className="text-sm text-muted">
                       {p.durasiMinggu} minggu · {p.kapasitas > 1 ? `${p.kapasitas} anak sekaligus` : "1 anak"}
@@ -139,7 +157,7 @@ export default function PosMagangPage() {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      className="btn-ghost h-9 px-3 text-xs"
+                      className="btn-ghost h-11 px-3 text-xs"
                       aria-label={`Ubah pos ${p.nama}`}
                       onClick={() =>
                         setFormPos({
@@ -148,6 +166,7 @@ export default function PosMagangPage() {
                           deskripsi: p.deskripsi ?? "",
                           durasiMinggu: p.durasiMinggu,
                           kapasitas: p.kapasitas,
+                          lokasi: p.lokasi ?? "",
                           urutan: p.urutan,
                           pembimbingId: p.pembimbing ? String(p.pembimbing.id) : "",
                           aktif: p.aktif,
@@ -157,7 +176,7 @@ export default function PosMagangPage() {
                       <IconPencil /> Ubah
                     </button>
                     <button
-                      className="btn-ghost h-9 px-3 text-xs text-danger"
+                      className="btn-ghost h-11 px-3 text-xs text-danger"
                       aria-label={`Hapus pos ${p.nama}`}
                       onClick={() => {
                         if (confirm(`Hapus pos "${p.nama}"? Riwayat nilai anak tetap tersimpan; jadwal mendatang di pos ini dibuang — susun ulang rotasi sesudahnya.`))
@@ -183,11 +202,11 @@ export default function PosMagangPage() {
                             </p>
                             <p className="text-xs text-muted">Jawaban benar: {s.pilihan[s.benar]}</p>
                           </div>
-                          <button className="btn-ghost h-8 px-2 text-xs" aria-label="Ubah soal" onClick={() => setFormSoal({ ...s, posId: p.id })}>
+                          <button className="btn-ghost h-11 px-2 text-xs" aria-label="Ubah soal" onClick={() => setFormSoal({ ...s, posId: p.id })}>
                             <IconPencil />
                           </button>
                           <button
-                            className="btn-ghost h-8 px-2 text-xs text-danger"
+                            className="btn-ghost h-11 px-2 text-xs text-danger"
                             aria-label="Hapus soal"
                             onClick={() => confirm("Hapus soal ini?") && jalankan(() => api(`/api/magang/soal/${s.id}`, { method: "DELETE" }), "Soal dihapus.")}
                           >
@@ -196,7 +215,7 @@ export default function PosMagangPage() {
                         </div>
                       ))}
                       <button
-                        className="btn-ghost h-9 text-xs"
+                        className="btn-ghost h-11 text-xs"
                         onClick={() => setFormSoal({ posId: p.id, pertanyaan: "", pilihan: ["", "", "", ""], benar: 0, aktif: true })}
                       >
                         <IconPlus /> Tambah soal
@@ -218,6 +237,23 @@ export default function PosMagangPage() {
             <label className="block">
               <span className="text-sm font-semibold text-fg">Nama pos</span>
               <input className="input mt-1.5" value={formPos.nama} onChange={(e) => setFormPos({ ...formPos, nama: e.target.value })} placeholder="mis. Operator Cetak" maxLength={80} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-fg">Lokasi (opsional)</span>
+              <input
+                className="input mt-1.5"
+                value={formPos.lokasi}
+                onChange={(e) => setFormPos({ ...formPos, lokasi: e.target.value })}
+                placeholder="mis. Pusat atau Cabang 2"
+                maxLength={80}
+                list="saran-lokasi-pos"
+              />
+              <datalist id="saran-lokasi-pos">
+                {[...new Set((data?.pos ?? []).map((p) => p.lokasi).filter((l): l is string => !!l))].map((l) => (
+                  <option key={l} value={l} />
+                ))}
+              </datalist>
+              <span className="mt-1 block text-xs text-muted">Isi bila pos ini ada di tempat lain. Tampil di kartu pos dan jadwal rotasi.</span>
             </label>
             <fieldset>
               <legend className="text-sm font-semibold text-fg">Lama di pos ini</legend>
@@ -291,10 +327,10 @@ export default function PosMagangPage() {
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <button className="btn-ghost h-10 text-sm" onClick={() => setFormPos(null)}>
+              <button className="btn-ghost h-11 text-sm" onClick={() => setFormPos(null)}>
                 Batal
               </button>
-              <button className="btn-primary h-10 text-sm" onClick={simpanPos} disabled={busy || formPos.nama.trim().length < 2}>
+              <button className="btn-primary h-11 text-sm" onClick={simpanPos} disabled={busy || formPos.nama.trim().length < 2}>
                 {busy ? "Menyimpan…" : "Simpan"}
               </button>
             </div>
@@ -336,7 +372,7 @@ export default function PosMagangPage() {
                     {formSoal.pilihan.length > 2 && (
                       <button
                         type="button"
-                        className="btn-ghost h-9 px-2 text-xs"
+                        className="btn-ghost h-11 px-2 text-xs"
                         aria-label={`Buang pilihan ${i + 1}`}
                         onClick={() =>
                           setFormSoal({
@@ -352,7 +388,7 @@ export default function PosMagangPage() {
                   </div>
                 ))}
                 {formSoal.pilihan.length < 6 && (
-                  <button type="button" className="btn-ghost h-9 text-xs" onClick={() => setFormSoal({ ...formSoal, pilihan: [...formSoal.pilihan, ""] })}>
+                  <button type="button" className="btn-ghost h-11 text-xs" onClick={() => setFormSoal({ ...formSoal, pilihan: [...formSoal.pilihan, ""] })}>
                     <IconPlus /> Tambah pilihan
                   </button>
                 )}
@@ -363,11 +399,11 @@ export default function PosMagangPage() {
               Aktif (ikut diundi)
             </label>
             <div className="flex justify-end gap-2 border-t border-border pt-4">
-              <button className="btn-ghost h-10 text-sm" onClick={() => setFormSoal(null)}>
+              <button className="btn-ghost h-11 text-sm" onClick={() => setFormSoal(null)}>
                 Batal
               </button>
               <button
-                className="btn-primary h-10 text-sm"
+                className="btn-primary h-11 text-sm"
                 onClick={simpanSoal}
                 disabled={busy || formSoal.pertanyaan.trim().length < 5 || formSoal.pilihan.some((p) => !p.trim())}
               >

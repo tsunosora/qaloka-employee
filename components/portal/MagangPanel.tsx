@@ -6,6 +6,7 @@ import { IconAlert, IconCheck, IconX } from "@/components/ui/icons";
 import { Card, longDate, soft } from "@/components/portal/ui";
 import { tglPendek, warnaNilai } from "@/components/magang/ui";
 import { JurnalMagang } from "@/components/portal/JurnalMagang";
+import { SideQuestMagang } from "@/components/portal/SideQuestMagang";
 import { hitungBenar, predikat } from "@/lib/services/magang/nilai";
 
 type Soal = { id: number; pertanyaan: string; pilihan: string[] };
@@ -115,6 +116,8 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
       </Card>
 
       <JurnalMagang token={token} q={q} bolehKirim={!ownerQuery} />
+
+      <SideQuestMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
       {data.tugasTerbuka.length === 0 ? (
         <Card title="Tugas mengingat">

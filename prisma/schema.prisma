@@ -59,18 +59,19 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  assessments         Assessment[]      @relation("Evaluator")
+  assessments         Assessment[]        @relation("Evaluator")
   auditLogs           AuditLog[]
   notifications       Notification[]
-  leaveDecisions      LeaveRequest[]    @relation("LeaveDecider")
-  redemptionDecisions PointRedemption[] @relation("RedemptionDecider")
-  lemburDecisions     PengajuanLembur[] @relation("LemburDecider")
-  reimburseDecisions  Reimbursement[]   @relation("ReimburseDecider")
-  absenHpDecisions    AbsenHpBukti[]    @relation("AbsenHpDecider")
-  absenTimDecisions   AbsenTimBaris[]   @relation("AbsenTimDecider")
-  rekapDecisions      RekapHarian[]     @relation("RekapDecider")
-  magangDinilai       MagangTugas[]     @relation("MagangPenilai")
-  magangJurnalDicek   MagangJurnal[]    @relation("MagangJurnalCek")
+  leaveDecisions      LeaveRequest[]      @relation("LeaveDecider")
+  redemptionDecisions PointRedemption[]   @relation("RedemptionDecider")
+  lemburDecisions     PengajuanLembur[]   @relation("LemburDecider")
+  reimburseDecisions  Reimbursement[]     @relation("ReimburseDecider")
+  absenHpDecisions    AbsenHpBukti[]      @relation("AbsenHpDecider")
+  absenTimDecisions   AbsenTimBaris[]     @relation("AbsenTimDecider")
+  rekapDecisions      RekapHarian[]       @relation("RekapDecider")
+  magangDinilai       MagangTugas[]       @relation("MagangPenilai")
+  magangJurnalDicek   MagangJurnal[]      @relation("MagangJurnalCek")
+  magangMisiDiputus   MagangMisiKiriman[] @relation("MagangMisiPutus")
 }
 
 model Department {
@@ -196,6 +197,7 @@ model Employee {
   magangDibimbing      MagangPos[]            @relation("MagangPembimbing")
   magangDinilai        MagangTugas[]          @relation("MagangPenilaiKaryawan")
   magangJurnalDicek    MagangJurnal[]         @relation("MagangJurnalCekKaryawan")
+  magangMisiDiputus    MagangMisiKiriman[]    @relation("MagangMisiPutusKaryawan")
 
   @@index([isActive])
 }
@@ -1005,6 +1007,8 @@ model MagangPos {
   kapasitas    Int       @default(1)
   urutan       Int       @default(0)
   pembimbingId Int?
+  // Tempat pos ini dikerjakan (mis. "Pusat", "Voliko Sport") — label saja, tampil di jadwal & HP anak.
+  lokasi       String?   @db.VarChar(80)
   aktif        Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -1036,21 +1040,27 @@ model MagangSoal {
 }
 
 model MagangPeserta {
-  id         Int       @id @default(autoincrement())
-  employeeId Int       @unique
-  sekolah    String?   @db.VarChar(150)
-  jurusan    String?   @db.VarChar(100)
-  mulai      DateTime
-  selesai    DateTime?
-  aktif      Boolean   @default(true)
-  catatan    String?   @db.Text
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id             Int       @id @default(autoincrement())
+  employeeId     Int       @unique
+  sekolah        String?   @db.VarChar(150)
+  jurusan        String?   @db.VarChar(100)
+  // Guru pembimbing dari sekolah + kontaknya (9 Nov 2026: peserta dari sekolah berbeda).
+  guruPembimbing String?   @db.VarChar(150)
+  kontakGuru     String?   @db.VarChar(60)
+  mulai          DateTime
+  selesai        DateTime?
+  aktif          Boolean   @default(true)
+  catatan        String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  employee  Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee  Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   penugasan MagangPenugasan[]
   tugas     MagangTugas[]
   jurnal    MagangJurnal[]
+  misi      MagangMisiKiriman[]
+
+  @@index([sekolah])
 }
 
 // Satu blok rotasi: anak memegang pos `posId` selama `minggu` minggu mulai Senin `mulai`.
@@ -1147,6 +1157,8 @@ model MagangDaftar {
   berlakuSampai DateTime
   mulaiMagang   DateTime?
   selesaiMagang DateTime?
+  // Tautan khusus satu sekolah/rombongan: diisi → kolom sekolah di formulir sudah terisi & dikunci.
+  sekolah       String?   @db.VarChar(150)
   aktif         Boolean   @default(true)
   createdAt     DateTime  @default(now())
 
@@ -1156,24 +1168,80 @@ model MagangDaftar {
 // token = publicToken karyawan nanti (tautan HP yang dipegang anak tidak berubah sesudah
 // disetujui). pinHash = PIN portal yang dibuat anak saat mendaftar (bcrypt).
 model MagangPendaftar {
-  id          Int       @id @default(autoincrement())
-  daftarId    Int
-  token       String    @unique @db.VarChar(36)
-  namaLengkap String    @db.VarChar(150)
-  panggilan   String?   @db.VarChar(50)
-  hp          String?   @db.VarChar(30)
-  sekolah     String?   @db.VarChar(150)
-  jurusan     String?   @db.VarChar(100)
-  mulai       DateTime
-  selesai     DateTime?
-  pinHash     String    @db.VarChar(100)
-  status      String    @default("menunggu") @db.VarChar(20) // menunggu | disetujui | ditolak
-  alasanTolak String?   @db.VarChar(255)
-  employeeId  Int?
-  diputusAt   DateTime?
-  createdAt   DateTime  @default(now())
+  id             Int       @id @default(autoincrement())
+  daftarId       Int
+  token          String    @unique @db.VarChar(36)
+  namaLengkap    String    @db.VarChar(150)
+  panggilan      String?   @db.VarChar(50)
+  hp             String?   @db.VarChar(30)
+  sekolah        String?   @db.VarChar(150)
+  jurusan        String?   @db.VarChar(100)
+  guruPembimbing String?   @db.VarChar(150)
+  kontakGuru     String?   @db.VarChar(60)
+  mulai          DateTime
+  selesai        DateTime?
+  pinHash        String    @db.VarChar(100)
+  status         String    @default("menunggu") @db.VarChar(20) // menunggu | disetujui | ditolak
+  alasanTolak    String?   @db.VarChar(255)
+  employeeId     Int?
+  diputusAt      DateTime?
+  createdAt      DateTime  @default(now())
 
   daftar MagangDaftar @relation(fields: [daftarId], references: [id], onDelete: Cascade)
 
   @@index([status])
+}
+
+// ── Side quest magang (9 Nov 2026) ─────────────────────────────────────────────────────────────
+// Misi WAJIB di luar rotasi pos (Customer Service, Desain Grafis, Digital Marketing) yang dikerjakan
+// sepanjang magang. Berlaku untuk SEMUA peserta (tanpa baris penugasan): misi aktif = tugas tiap anak.
+// kategori = KATEGORI_MISI di lib/services/magang/misi.ts; bukti = daftar "foto,tautan,teks".
+model MagangMisi {
+  id        Int       @id @default(autoincrement())
+  kategori  String    @db.VarChar(20)
+  level     String    @default("dasar") @db.VarChar(20)
+  judul     String    @db.VarChar(150)
+  deskripsi String?   @db.Text
+  bukti     String    @default("foto") @db.VarChar(30)
+  poin      Int       @default(10)
+  urutan    Int       @default(0)
+  aktif     Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  kiriman MagangMisiKiriman[]
+
+  @@index([kategori])
+}
+
+// Bukti misi dari anak. Satu baris per anak per misi: ditolak → anak memperbaiki & mengirim ulang
+// (baris yang sama kembali "menunggu"); disetujui → terkunci. foto = path di storage/magang.
+model MagangMisiKiriman {
+  id                    Int       @id @default(autoincrement())
+  misiId                Int
+  pesertaId             Int
+  teks                  String?   @db.Text
+  tautan                String?   @db.VarChar(500)
+  foto                  Json
+  status                String    @default("menunggu") @db.VarChar(20) // menunggu | disetujui | ditolak
+  catatan               String?   @db.Text
+  kirimKe               Int       @default(1)
+  dikirimAt             DateTime  @default(now())
+  diputusAt             DateTime?
+  diputusOlehId         Int?
+  diputusOlehKaryawanId Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  misi                MagangMisi    @relation(fields: [misiId], references: [id], onDelete: Cascade)
+  peserta             MagangPeserta @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+  diputusOleh         User?         @relation("MagangMisiPutus", fields: [diputusOlehId], references: [id], onDelete: SetNull)
+  diputusOlehKaryawan Employee?     @relation("MagangMisiPutusKaryawan", fields: [diputusOlehKaryawanId], references: [id], onDelete: SetNull)
+
+  @@unique([misiId, pesertaId])
+  @@index([pesertaId])
+  @@index([status])
+  @@index([diputusOlehId])
+  @@index([diputusOlehKaryawanId])
 }
