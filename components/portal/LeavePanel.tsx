@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/fetcher";
-import { IconAlert, IconCheck, IconPlus, IconTrash } from "@/components/ui/icons";
+import { IconAlert, IconCheck, IconPlus, IconTrash, IconX } from "@/components/ui/icons";
 import { kirimForm } from "@/components/reimbursement/ui";
 import { Card, Empty, LeaveStatusBadge, longDate, soft } from "./ui";
 import type { LampiranMeta, LeaveRequestItem } from "./types";
@@ -163,8 +163,14 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
       <Card
         title="Pengajuan izin"
         action={
-          <button onClick={() => setOpen((o) => !o)} className="btn-ghost h-9 text-xs">
-            <IconPlus className="text-[15px]" /> {open ? "Tutup" : "Ajukan"}
+          <button
+            onClick={() => {
+              setOpen((o) => !o);
+              setOk("");
+            }}
+            className="btn-ghost h-9 text-xs"
+          >
+            {open ? <IconX className="text-[15px]" /> : <IconPlus className="text-[15px]" />} {open ? "Tutup" : "Ajukan"}
           </button>
         }
       >

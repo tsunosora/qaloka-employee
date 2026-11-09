@@ -181,3 +181,27 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
 - Verifikasi API portal (sesi 5 menit, GET saja; `~/alat/verifikasi-sidequest-20261109.sh` + `.log`): keempat anak posIni Orientasi,
   berikut = pos 16 Nov sesuai jadwal, hari tugas Sabtu, 19 misi 0/7·0/7·0/5; Bimbingan Faisal: 6 pos, 0 bukti menunggu.
 - **Ingat:** Orientasi masih aktif → sebelum "Susun ulang semua", nonaktifkan dulu; untuk anak baru pakai "Tambah peserta baru saja".
+
+## Kategori side quest diatur admin + lampiran izin (10 Nov 2026, `feat/magang-kategori-izin` — BELUM dideploy)
+
+- **Kategori side quest** = tabel `MagangMisiKategori` (`kunci` tetap, `nama`, `ringkas`, `prioritas`, `urutan`, `aktif`).
+  `MagangMisi.kategori` tetap teks kunci, kini FK ke `kunci` (ganti nama tidak mengubah kunci; hapus diblokir selama dipakai,
+  termasuk misi yang sudah dihapus lunak). Migrasi `20261110000000_magang_misi_kategori`: buat tabel, `INSERT IGNORE` 3 kategori
+  lama (cs/desain/marketing, urutan 1–3) + kunci lain yang sudah dipakai misi (urutan 99), lebarkan kolom kategori 20→40, lalu
+  FK. Data misi/kiriman tidak berubah (diuji: checksum 20 misi sama sebelum/sesudah). `KATEGORI_AWAL` hanya untuk bank awal.
+- UI: Magang → Side Quest → **Kategori** (tambah, ganti nama, urutkan naik/turun, aktif/nonaktif, hapus; bila dipakai →
+  "Nonaktifkan saja" atau "Pindahkan misinya ke…" lalu hapus). Kategori nonaktif = misinya tidak tampil di HP & tidak dihitung
+  progres (sama seperti misi nonaktif). Dropdown form misi, chip Minggu Ini, rapor, HP anak, Bimbingan ikut tabel. Tingkat
+  (Dasar/Menengah/Lanjut) tetap. API: `/api/magang/misi/kategori` (GET/POST), `[id]` (PATCH/DELETE→409 `{dipakai}`),
+  `[id]/pindah {ke}`, `urutan {ids}`.
+- **Lampiran izin** (`LeaveLampiran`, migrasi `20261110010000_izin_lampiran`, `lib/services/leave/lampiran.ts`): di `/me` tab Izin
+  (karyawan & peserta magang) 1–3 berkas per pengajuan — foto diperkecil di HP jadi JPEG (helper absen HP; HEIC yang tak bisa
+  dibaca browser → pesan ramah) atau PDF, maks 5 MB/berkas. Tambah/hapus lampiran selama masih menunggu. Server memeriksa isi
+  (byte JPG/PNG/WebP/`%PDF-`), nama acak di `storage/izin/YYYY-MM/` (mode 0600, ikut tar cadangan deploy), pengaman path.
+  Akses: pemilik (sesi PIN; mode owner baca saja) + akun dasbor yang boleh memutus izin (`requireManager`) — tidak ada URL
+  publik. Dasbor Izin: lencana "N lampiran", gambar mini + pratinjau, "Unduh PDF". Batas body proxy Next 10 MB → HP mengunggah
+  bertahap ≤9 MB (pengajuan + tambahan). Pembatalan izin hanya mengubah status — lampiran tetap sebagai bukti. Formulir izin
+  publik (tautan) belum menerima lampiran.
+- Deploy: `tools/magang/deploy-kategori-izin-voliko.sh <SHA>` (ff-only dari `0a179c3`, cadangan DB+.env+storage, migrasi, build,
+  restart `ratemystaff` saja, banding hitungan misi per kategori & izin sebelum/sesudah).
+- Tes: `magang-misi-kategori`, `leave-lampiran` (+ pembaruan `magang-misi`, `magang-sidequest-ui`).

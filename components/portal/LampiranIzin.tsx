@@ -144,7 +144,7 @@ export function PilihLampiran({
         Lampiran
       </span>
       <p id={`${id}-bantu`} className="mb-2 text-xs text-subtle">
-        Opsional — foto surat dokter atau PDF, maks 3 berkas, 5 MB
+        Opsional — foto surat dokter atau PDF, maks 3 berkas, 5&nbsp;MB per berkas
       </p>
 
       {nilai.length > 0 && (

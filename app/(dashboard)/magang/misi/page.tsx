@@ -408,7 +408,7 @@ export default function SideQuestPage() {
       )}
 
       {kelolaKategori && kategori && (
-        <Modal title="Kategori side quest" onClose={() => setKelolaKategori(false)}>
+        <Modal title="Kategori side quest" size="xl" onClose={() => setKelolaKategori(false)}>
           <KelolaKategori kategori={kategori} onBerubah={muat} />
         </Modal>
       )}

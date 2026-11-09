@@ -137,7 +137,8 @@ export function KelolaKategori({ kategori, onBerubah }: { kategori: KategoriAdmi
         Kategori mengelompokkan misi side quest. Kategori yang <b className="text-fg">nonaktif</b> tidak diberikan ke anak dan tidak dihitung di progres —
         misinya tetap tersimpan. Urutan di sini = urutan di HP anak dan di rapor.
       </p>
-      <div aria-live="polite" className="space-y-2">
+      {/* Menempel di atas area gulir dialog supaya pesan tetap terlihat saat menyunting baris di bawah. */}
+      <div aria-live="polite" className={`space-y-2 ${notice || galat ? "sticky top-0 z-10 -mx-1 rounded-xl bg-bg p-1 shadow-sm" : ""}`}>
         {notice && <Pesan jenis="ok">{notice}</Pesan>}
         {galat && <Pesan jenis="galat">{galat}</Pesan>}
       </div>
@@ -179,9 +180,9 @@ export function KelolaKategori({ kategori, onBerubah }: { kategori: KategoriAdmi
                     <p className="font-semibold text-fg">
                       {k.nama}
                       {k.prioritas && (
-                        <span className="ml-2 rounded-full border border-border px-2 py-0.5 align-middle text-xs font-semibold text-muted">Prioritas {k.prioritas}</span>
+                        <span className="ml-2 inline-block whitespace-nowrap rounded-full border border-border px-2 py-0.5 align-middle text-xs font-semibold text-muted">Prioritas {k.prioritas}</span>
                       )}
-                      {!k.aktif && <span className="ml-2 align-middle text-xs font-normal text-subtle">(nonaktif)</span>}
+                      {!k.aktif && <span className="ml-2 inline-block whitespace-nowrap align-middle text-xs font-normal text-subtle">(nonaktif)</span>}
                     </p>
                     {k.ringkas && <p className="text-xs text-muted">{k.ringkas}</p>}
                     <p className="text-xs text-subtle">{k.jumlahMisi} misi</p>
