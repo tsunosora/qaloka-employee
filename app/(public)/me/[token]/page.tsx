@@ -10,6 +10,7 @@ import {
   IconSettings,
 } from "@/components/ui/icons";
 import { PinGate } from "@/components/portal/PinGate";
+import { TABS_PORTAL as TABS, tabTampil, subjudulPortal } from "@/lib/services/portal/tab-portal";
 import { OverviewPanel } from "@/components/portal/OverviewPanel";
 import { AttendancePanel } from "@/components/portal/AttendancePanel";
 import { AssessmentPanel } from "@/components/portal/AssessmentPanel";
@@ -20,22 +21,11 @@ import { LemburPanel } from "@/components/portal/LemburPanel";
 import { ReimbursementPanel } from "@/components/portal/ReimbursementPanel";
 import { KunjunganPanel } from "@/components/portal/KunjunganPanel";
 import { TimesheetPanel } from "@/components/portal/TimesheetPanel";
+import { MagangPanel } from "@/components/portal/MagangPanel";
+import { BimbinganPanel } from "@/components/portal/BimbinganPanel";
 import { soft } from "@/components/portal/ui";
 import type { Overview, PortalState } from "@/components/portal/types";
 
-// `fitur` = kode lisensi yang harus ada supaya tab tampil (lib/services/portal/keadaan.ts).
-// `bulanan` = tab memakai pemilih bulan di atas; yang tidak punya rentangnya sendiri.
-const TABS: readonly { key: string; label: string; fitur?: string; bulanan?: boolean }[] = [
-  { key: "overview", label: "Ringkasan", bulanan: true },
-  { key: "attendance", label: "Absensi", bulanan: true },
-  { key: "assessment", label: "Penilaian", bulanan: true },
-  { key: "points", label: "Poin", bulanan: true },
-  { key: "leave", label: "Izin" },
-  { key: "lembur", label: "Lembur", fitur: "hr.overtime" },
-  { key: "kunjungan", label: "Kunjungan", fitur: "hr.visits" },
-  { key: "reimbursement", label: "Klaim", fitur: "hr.reimbursement" },
-  { key: "timesheet", label: "Timesheet", fitur: "hr.timesheet" },
-];
 type TabKey = string;
 
 function currentMonth(): { year: number; month: number } {
@@ -53,7 +43,9 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
       : "";
 
   const [state, setState] = useState<PortalState | null>(null);
-  const [invalid, setInvalid] = useState(false);
+  // Pesan bila tautan tidak bisa dibuka (null = tidak ada galat). Pendaftar magang yang belum
+  // disetujui mendapat pesan dari server ("menunggu persetujuan"), bukan pesan umum.
+  const [invalid, setInvalid] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("overview");
   const [{ year, month }, setPeriod] = useState(currentMonth);
   const [data, setData] = useState<Overview | null>(null);
@@ -74,9 +66,12 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
 
   const loadState = useCallback(async () => {
     try {
-      setState(await api<PortalState>(`/api/public/portal/${token}?v=1${ownerQuery}`));
-    } catch {
-      setInvalid(true);
+      const s = await api<PortalState>(`/api/public/portal/${token}?v=1${ownerQuery}`);
+      setState(s);
+      // Anak magang membuka halaman ini terutama untuk pos & tugas mingguannya.
+      if (s.magang && s.fitur?.["hr.assessment"] !== false) setTab((t) => (t === "overview" ? "magang" : t));
+    } catch (e) {
+      setInvalid(e instanceof Error && e.message ? e.message : "Tautan tidak valid atau karyawan sudah tidak aktif.");
     }
   }, [token, ownerQuery]);
 
@@ -117,7 +112,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
           >
             <IconAlert className="text-[26px]" />
           </span>
-          <p className="text-muted">Tautan tidak valid atau karyawan sudah tidak aktif.</p>
+          <p className="text-muted">{invalid}</p>
         </div>
       </Centered>
     );
@@ -139,6 +134,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
           employee={state.employee}
           pinSet={state.pinSet}
           posproPin={state.posproPin}
+          magang={state.magang}
           onSuccess={() => setState({ ...state, authenticated: true })}
         />
       </Centered>
@@ -159,8 +155,9 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
               {state.employee.fullName}
             </h1>
             <p className="truncate text-xs text-muted">
-              {[state.employee.position, state.employee.department].filter(Boolean).join(" · ") ||
-                "Karyawan"}
+              {state.magang
+                ? subjudulPortal({ magang: true, position: null, department: null })
+                : [state.employee.position, state.employee.department].filter(Boolean).join(" · ") || "Karyawan"}
             </p>
           </div>
           {!state.asManager && (
@@ -199,7 +196,7 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
         <div className="flex flex-wrap items-center gap-2">
           {/* Tab di barisnya sendiri: kalau berbagi baris dengan pemilih bulan, di HP cuma satu tab yang terlihat. */}
           <nav ref={deretTab} className="glass flex w-full gap-1 overflow-x-auto rounded-2xl p-1">
-            {TABS.filter((t) => !t.fitur || state.fitur?.[t.fitur] !== false).map((t) => (
+            {TABS.filter((t) => tabTampil(t, state)).map((t) => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
@@ -244,7 +241,11 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
           )}
         </div>
 
-        {tab === "leave" ? (
+        {tab === "magang" && state.magang ? (
+          <MagangPanel token={token} ownerQuery={ownerQuery} />
+        ) : tab === "bimbingan" && state.pembimbing ? (
+          <BimbinganPanel token={token} ownerQuery={ownerQuery} />
+        ) : tab === "leave" ? (
           <LeavePanel token={token} ownerQuery={ownerQuery} />
         ) : tab === "lembur" ? (
           <LemburPanel token={token} ownerQuery={ownerQuery} />

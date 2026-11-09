@@ -5,6 +5,7 @@ import { api } from "@/lib/fetcher";
 import { IconAlert, IconAttendance } from "@/components/ui/icons";
 import { PinStrengthMeter } from "./PinStrengthMeter";
 import type { PortalEmployeeInfo } from "./types";
+import { labelHalaman, subjudulPortal } from "@/lib/services/portal/tab-portal";
 
 /** Layar PIN: membuat PIN pertama kali, atau masuk dengan PIN yang sudah ada. */
 export function PinGate({
@@ -14,6 +15,7 @@ export function PinGate({
   posproPin,
   onSuccess,
   jalurSesi,
+  magang = false,
 }: {
   token: string;
   employee: PortalEmployeeInfo;
@@ -23,6 +25,8 @@ export function PinGate({
   onSuccess: () => void;
   /** Alamat sesi PIN; bawaan portal. Halaman absen HP memakai jalurnya sendiri (gerbang lisensinya beda). */
   jalurSesi?: string;
+  /** Peserta magang aktif → label "Halaman Peserta Magang" / "Peserta magang" (bukan "Karyawan"). */
+  magang?: boolean;
 }) {
   // Layar "masuk" bila sudah ada PIN mana pun; "buat PIN" hanya bila belum punya keduanya.
   const canLogin = pinSet || posproPin;
@@ -59,10 +63,10 @@ export function PinGate({
           <IconAttendance className="text-[22px]" />
         </span>
         <div className="text-xs font-semibold uppercase tracking-wide text-primary">
-          Halaman Karyawan
+          {labelHalaman(magang)}
         </div>
         <h1 className="mt-2 font-display text-xl font-bold text-fg">{employee.fullName}</h1>
-        <p className="text-sm text-muted">{employee.position ?? employee.department ?? "Karyawan"}</p>
+        <p className="text-sm text-muted">{subjudulPortal({ magang, position: employee.position, department: employee.department })}</p>
       </div>
 
       {error && (

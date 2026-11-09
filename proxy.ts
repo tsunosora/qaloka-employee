@@ -28,6 +28,8 @@ export default auth((req) => {
     pathname.startsWith("/absence") ||
     pathname === "/me" ||
     pathname.startsWith("/me/") ||
+    // Pendaftaran magang mandiri: dibuka anak yang belum punya akun (lewat tautan dari pengawas).
+    pathname.startsWith("/daftar-magang/") ||
     // Absen lewat HP: dibuka karyawan TANPA akun (masuk dengan PIN), dan layar QR dibuka
     // tablet/TV toko. Dicocokkan per segmen — "/absen" bukan awalan "/absence".
     pathname.startsWith("/absen/") ||

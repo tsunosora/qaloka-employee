@@ -70,6 +70,13 @@ export const ATURAN_API: readonly Aturan[] = [
   { awalan: "/api/reports/employee/*/public-feedbacks", fitur: "hr.guest_rating" },
   { awalan: "/api/reports/guest-rating", fitur: "hr.guest_rating" },
   { awalan: "/api/reports", fitur: "hr.assessment" },
+  // Program magang (6 Nov 2026): rotasi pos + tugas mengingat mingguan = bagian penilaian kinerja,
+  // tanpa kode fitur baru (paket Kinerja).
+  { awalan: "/api/magang", fitur: "hr.assessment" },
+  { awalan: "/api/public/portal/*/magang", fitur: "hr.assessment" },
+  // Pembimbing menilai/mengecek anak di posnya dari halaman pribadinya (8 Nov 2026).
+  { awalan: "/api/public/portal/*/bimbingan", fitur: "hr.assessment" },
+  { awalan: "/api/public/daftar-magang", fitur: "hr.assessment" },
 
   { awalan: "/api/public/employee", fitur: "hr.guest_rating" },
   { awalan: "/api/public/portal", fitur: "hr.portal" },
@@ -92,6 +99,8 @@ export const ATURAN_HALAMAN: readonly Aturan[] = [
   { awalan: "/points", fitur: "hr.points" },
   { awalan: "/assessments", fitur: "hr.assessment" },
   { awalan: "/reports", fitur: "hr.assessment" },
+  { awalan: "/magang", fitur: "hr.assessment" },
+  { awalan: "/daftar-magang", fitur: "hr.assessment" },
   { awalan: "/settings/work-schedules", fitur: "hr.schedule" },
   { awalan: "/rate", fitur: "hr.guest_rating" },
   { awalan: "/me", fitur: "hr.portal" },
