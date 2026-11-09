@@ -123,7 +123,7 @@ Simulasi penuh 13 minggu (laporan `D:\FAISAL\laporan-magang\`) menemukan 9 hal; 
   (`grep "absen-hp] TOLAK"`: karyawan, kode, jarak, akurasi, ukuran/jenis foto — tanpa koordinat/token). Diuji di
   produksi dengan kiriman id-perangkat tak sah (tercatat, tidak ada yang ditulis). Lokasi aktif: Voliko Pusat & Voliko Cabang.
 
-## Side quest, sekolah & rombongan baru (9 Nov 2026, `feat/magang-sidequest` — BELUM dideploy)
+## Side quest, sekolah & rombongan baru (9 Nov 2026, `feat/magang-sidequest` — terdeploy ke Voliko 14.52)
 
 Dasar: dokumen *Materi Internship* Faisal (9 Nov). Tugas UTAMA (rotasi, waktu terbanyak) = **Konten** & **Produksi**;
 **Customer Service** & **Desain Grafis** (prioritas menengah) dan **Digital Marketing** (rendah) = SIDE QUEST wajib
@@ -161,3 +161,23 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
   build, restart `ratemystaff` saja). Migrasi `20261109000000_magang_sidequest_sekolah` hanya MENAMBAH (2 tabel, 6 kolom nullable + 1 indeks).
 - Tes: `magang-misi`, `magang-rotasi-rombongan`, `magang-sekolah`, `magang-pendaftaran-sekolah`, `magang-pos-prioritas`,
   `magang-sidequest-ui`, `portal-side-quest`.
+
+### Deploy Voliko 9 Nov 2026 (izin Faisal)
+
+- **14.51–14.52** `~/web/rate-my-staff` `f77dedb` → **`0a179c3`** (ff-only; skrip `~/alat/deploy-rms-sidequest-20261109.sh` + `.log`,
+  dijalankan `setsid nohup`; cadangan `~/cadangan/deploy-rms-20261109-145127` 51 tabel 5,5 MB + .env + storage). Lockfile sama →
+  npm ci dilewati; migrasi `20261109000000_magang_sidequest_sekolah` terpasang; build OK (18 peringatan Turbopack = sama seperti
+  sebelumnya); restart `ratemystaff` saja (poller tidak berubah, tidak di-restart). Log galat tidak bertambah.
+- Diperiksa: /login, /me, /absen 200; `/magang/misi` & `/magang/rapor/sekolah` ada di build; absensi hari ini (16 baris, 4 HP) dan
+  jurnal (2) identik sebelum/sesudah; webhook Fingerspot hidup (GET 405), scan mesin terakhir 13.20 WIB (sebelum deploy) — scan
+  pulang belum terlihat saat dicek 15.00.
+- **14.59 skrip pos prioritas** (`npx tsx tools/magang/voliko-pos-prioritas.ts`, dry-run dulu → `--jalankan`; log
+  `~/alat/voliko-pos-prioritas-{dryrun-,}20261109.log`, cadangan `~/cadangan/magang-pos-prioritas-20261109-145944/`): pos baru
+  id 13–17 aktif, pos 9–12 (CS, Desainer, Operator Outdoor, Operator A3+) nonaktif (tidak dihapus), Orientasi (id 8) TETAP aktif;
+  4 penugasan Orientasi 9–14 Nov dipertahankan, 40 penugasan lama ≥16 Nov diganti 40 baru (0 berbagi). Tidak ada tugas/jurnal ≥16 Nov.
+- **15.00 bank side quest + sekolah** (`~/alat/voliko-misi-sekolah-20261109.ts` + `.log`, cadangan
+  `~/cadangan/magang-misi-sekolah-2026-11-09T07-59-55-430Z/`): 19 misi (CS 7, Desain 7, Marketing 5); `MagangPeserta.sekolah`
+  peserta #2 & #4 dirapikan jadi "SMK Negeri 2 Sewon" (hanya kolom itu; pendaftar & jurusan tidak disentuh).
+- Verifikasi API portal (sesi 5 menit, GET saja; `~/alat/verifikasi-sidequest-20261109.sh` + `.log`): keempat anak posIni Orientasi,
+  berikut = pos 16 Nov sesuai jadwal, hari tugas Sabtu, 19 misi 0/7·0/7·0/5; Bimbingan Faisal: 6 pos, 0 bukti menunggu.
+- **Ingat:** Orientasi masih aktif → sebelum "Susun ulang semua", nonaktifkan dulu; untuk anak baru pakai "Tambah peserta baru saja".
