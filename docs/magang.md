@@ -182,7 +182,7 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
   berikut = pos 16 Nov sesuai jadwal, hari tugas Sabtu, 19 misi 0/7·0/7·0/5; Bimbingan Faisal: 6 pos, 0 bukti menunggu.
 - **Ingat:** Orientasi masih aktif → sebelum "Susun ulang semua", nonaktifkan dulu; untuk anak baru pakai "Tambah peserta baru saja".
 
-## Kategori side quest diatur admin + lampiran izin (10 Nov 2026, `feat/magang-kategori-izin` — BELUM dideploy)
+## Kategori side quest diatur admin + lampiran izin (`feat/magang-kategori-izin` — terdeploy ke Voliko 9 Nov 17.51)
 
 - **Kategori side quest** = tabel `MagangMisiKategori` (`kunci` tetap, `nama`, `ringkas`, `prioritas`, `urutan`, `aktif`).
   `MagangMisi.kategori` tetap teks kunci, kini FK ke `kunci` (ganti nama tidak mengubah kunci; hapus diblokir selama dipakai,
@@ -205,3 +205,16 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
 - Deploy: `tools/magang/deploy-kategori-izin-voliko.sh <SHA>` (ff-only dari `0a179c3`, cadangan DB+.env+storage, migrasi, build,
   restart `ratemystaff` saja, banding hitungan misi per kategori & izin sebelum/sesudah).
 - Tes: `magang-misi-kategori`, `leave-lampiran` (+ pembaruan `magang-misi`, `magang-sidequest-ui`).
+
+### Deploy Voliko 9 Nov 2026 17.51 (izin Faisal)
+
+- `~/web/rate-my-staff` `0a179c3` → **`abc2ee0`** (ff-only; `setsid nohup` skrip `~/alat/deploy-rms-kategori-izin-20261110.sh` + `.log`;
+  cadangan `~/cadangan/deploy-rms-20261109-175104` 53 tabel 5,6 MB + .env + storage). Lockfile sama (npm ci dilewati); migrasi
+  `20261110000000_magang_misi_kategori` + `20261110010000_izin_lampiran`; build OK (20 peringatan Turbopack: +2 dari akses berkas
+  dinamis `lib/services/leave/lampiran.ts`, jenis sama dengan absen-hp); restart `ratemystaff` saja (restart 7; poller tak disentuh).
+- Diperiksa (`~/alat/verifikasi-kategori-izin-20261110.sh` + `.log`, tanpa menulis): hitungan magang/izin sebelum = sesudah; 3 kategori
+  (cs/desain/marketing, Menengah/Menengah/Rendah, urutan 1–3); checksum misi per kategori identik (7/7/5), kiriman 0; 4 anak melihat
+  19 misi; kiriman berkas .txt → 422 "tidak bisa dipakai", LeaveRequest/LeaveLampiran/`storage/izin` tetap 2/0/0; lampiran tanpa sesi
+  401, dasbor tanpa login 302; /me /absen /login 200; log galat tidak bertambah; absensi hari ini (Fingerspot 16, HP 7) & jurnal (4)
+  identik. Unggah lampiran SAH sengaja tidak diuji di produksi (akan membuat pengajuan sungguhan + notifikasi manajer; tidak ada rute
+  hapus pengajuan) — diuji di DB uji lokal.
