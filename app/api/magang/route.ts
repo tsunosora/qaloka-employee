@@ -86,7 +86,7 @@ export const GET = route(async () => {
         sideQuest: (() => {
           const g = progres.get(p.id);
           return g
-            ? { kategori: g.kategori.map((k) => ({ kategori: k.kategori, selesai: k.selesai, total: k.total })), menunggu: g.menunggu, selesai: g.selesai, total: g.total }
+            ? { kategori: g.kategori.map((k) => ({ kategori: k.kategori, label: k.label, selesai: k.selesai, total: k.total })), menunggu: g.menunggu, selesai: g.selesai, total: g.total }
             : null;
         })(),
       };

@@ -169,7 +169,10 @@ export function RaporIsi({ data, onNilai, className = "" }: { data: RaporPayload
 
       <section className="break-inside-avoid">
         <h2 className="text-sm font-bold text-fg">Side Quest</h2>
-        <p className="mb-2 text-xs text-muted">Misi tambahan di luar pos (Customer Service, Desain Grafis, Digital Marketing). Tidak mengubah nilai akhir.</p>
+        <p className="mb-2 text-xs text-muted">
+          Misi tambahan di luar pos{sq.progres && sq.progres.kategori.length > 0 ? ` (${sq.progres.kategori.map((k) => k.label).join(", ")})` : ""}. Tidak mengubah nilai
+          akhir.
+        </p>
         {!sq.progres || sq.progres.total === 0 ? (
           <p className="text-sm text-subtle">Belum ada misi side quest yang diberikan.</p>
         ) : (

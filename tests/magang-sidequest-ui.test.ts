@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { labelSingkatKategori } from "@/lib/services/magang/rapor";
-import { KUNCI_KATEGORI } from "@/lib/services/magang/misi";
+import { labelSingkatKategori, KATEGORI_AWAL } from "@/lib/services/magang/misi";
 
 describe("side quest — label pendek kategori (chip Minggu Ini)", () => {
-  it("setiap kategori punya label pendek sendiri", () => {
-    const label = KUNCI_KATEGORI.map(labelSingkatKategori);
-    expect(label).toEqual(["CS", "Desain", "Marketing"]);
+  it("nama kategori dari DB dipakai apa adanya bila muat — tidak ada singkatan tetap di kode", () => {
+    const label = KATEGORI_AWAL.map((k) => labelSingkatKategori(k.nama));
+    expect(label).toEqual(["Customer Service", "Desain Grafis", "Digital Marketing"]);
     expect(new Set(label).size).toBe(label.length);
   });
 
-  it("kategori lain/tak dikenal tetap tampil", () => {
-    expect(labelSingkatKategori("lain")).toBe("Lainnya");
-    expect(labelSingkatKategori("foto")).toBe("foto");
+  it("nama panjang dipotong di batas kata dengan …", () => {
+    expect(labelSingkatKategori("Fotografi Produk dan Katalog Online")).toBe("Fotografi Produk…");
+    expect(labelSingkatKategori("Administrasigudangbesar")).toBe("Administrasigudan…");
+    expect(labelSingkatKategori("Desain & Percetakan Kaos")).toBe("Desain…");
+    expect(labelSingkatKategori("  Lainnya  ")).toBe("Lainnya");
   });
 });

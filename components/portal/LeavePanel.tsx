@@ -1,10 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/fetcher";
-import { IconAlert, IconCheck, IconPlus, IconTrash } from "@/components/ui/icons";
+import { IconAlert, IconCheck, IconPlus, IconTrash, IconX } from "@/components/ui/icons";
+import { kirimForm } from "@/components/reimbursement/ui";
 import { Card, Empty, LeaveStatusBadge, longDate, soft } from "./ui";
-import type { LeaveRequestItem } from "./types";
+import type { LampiranMeta, LeaveRequestItem } from "./types";
+import {
+  DaftarLampiran,
+  LAMPIRAN_MAKS_JUMLAH,
+  TERIMA_LAMPIRAN,
+  PilihLampiran,
+  kelompokkanKiriman,
+  lepasPratinjau,
+  siapkanLampiran,
+  tambahKeForm,
+  useLepasPratinjau,
+  type LampiranBaru,
+} from "./LampiranIzin";
 
 const TYPES = ["Izin", "Sakit", "Cuti"] as const;
 
@@ -24,17 +37,32 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lampiran, setLampiran] = useState<LampiranBaru[]>([]);
+  const [galatLampiran, setGalatLampiran] = useState<{ id: number; pesan: string } | null>(null);
+  const [sibukLampiran, setSibukLampiran] = useState<number | null>(null);
+  useLepasPratinjau(lampiran);
+  // Mode owner (?owner=1) hanya melihat — tombol ubah lampiran disembunyikan (server juga menolak).
+  const bolehUbah = !ownerQuery;
+  const base = `/api/public/portal/${token}/leave`;
+  const urlLampiran = (leaveId: number) => (id: number) => `${base}/${leaveId}/lampiran/${id}?v=1${ownerQuery}`;
 
-  const load = useCallback(async () => {
-    const r = await api<{ items: LeaveRequestItem[] }>(
-      `/api/public/portal/${token}/leave?v=1${ownerQuery}`
-    );
-    setItems(r.items);
-  }, [token, ownerQuery]);
+  const ambil = useCallback(
+    () =>
+      api<{ items: LeaveRequestItem[] }>(`/api/public/portal/${token}/leave?v=1${ownerQuery}`).then((r) => r.items),
+    [token, ownerQuery]
+  );
+  const load = useCallback(async () => setItems(await ambil()), [ambil]);
 
   useEffect(() => {
-    load().catch(() => setItems([]));
-  }, [load]);
+    let hidup = true;
+    ambil().then(
+      (r) => hidup && setItems(r),
+      () => hidup && setItems([])
+    );
+    return () => {
+      hidup = false;
+    };
+  }, [ambil]);
 
   async function submit() {
     setError("");
@@ -42,11 +70,37 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
     if (!reason.trim()) return setError("Tulis alasannya dulu.");
     setBusy(true);
     try {
-      await api(`/api/public/portal/${token}/leave`, {
-        method: "POST",
-        body: JSON.stringify({ type, startDate, endDate: endDate || null, reason }),
-      });
-      setOk("Pengajuan terkirim. Menunggu persetujuan owner.");
+      let pesanOk = "Pengajuan terkirim. Menunggu persetujuan owner.";
+      if (lampiran.length === 0) {
+        await api(base, {
+          method: "POST",
+          body: JSON.stringify({ type, startDate, endDate: endDate || null, reason }),
+        });
+      } else {
+        // Kiriman dipecah per ≤9 MB: kelompok pertama ikut pengajuan, sisanya ditambahkan sesudahnya.
+        const [pertama, ...lanjut] = kelompokkanKiriman(lampiran);
+        const form = new FormData();
+        form.set("type", type);
+        form.set("startDate", startDate);
+        if (endDate) form.set("endDate", endDate);
+        form.set("reason", reason);
+        tambahKeForm(form, pertama);
+        const dibuat = await kirimForm<{ id: number }>(base, form);
+        try {
+          for (const kel of lanjut) {
+            const f = new FormData();
+            tambahKeForm(f, kel);
+            await kirimForm(`${base}/${dibuat.id}/lampiran`, f);
+          }
+          pesanOk = `Pengajuan terkirim dengan ${lampiran.length} lampiran. Menunggu persetujuan owner.`;
+        } catch (e) {
+          const m = e instanceof Error ? e.message : "";
+          setGalatLampiran({ id: dibuat.id, pesan: `Sebagian lampiran gagal terkirim${m ? `: ${m}` : "."} Tambahkan lagi di sini.` });
+        }
+        lepasPratinjau(lampiran);
+        setLampiran([]);
+      }
+      setOk(pesanOk);
       setReason("");
       setEndDate("");
       setOpen(false);
@@ -55,6 +109,42 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
       setError(e instanceof Error ? e.message : "Gagal mengirim pengajuan.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Tambah lampiran ke pengajuan yang masih menunggu (langsung terkirim). */
+  async function tambahLampiran(leaveId: number, files: File[]) {
+    setGalatLampiran(null);
+    setSibukLampiran(leaveId);
+    const siap: LampiranBaru[] = [];
+    try {
+      for (const f of files) siap.push(await siapkanLampiran(f));
+      for (const kel of kelompokkanKiriman(siap)) {
+        const f = new FormData();
+        tambahKeForm(f, kel);
+        await kirimForm(`${base}/${leaveId}/lampiran`, f);
+      }
+      await load();
+    } catch (e) {
+      setGalatLampiran({ id: leaveId, pesan: e instanceof Error ? e.message : "Gagal menambah lampiran." });
+      await load().catch(() => undefined);
+    } finally {
+      lepasPratinjau(siap);
+      setSibukLampiran(null);
+    }
+  }
+
+  async function hapusLampiran(leaveId: number, l: LampiranMeta) {
+    if (!window.confirm(`Hapus lampiran "${l.nama}"?`)) return;
+    setGalatLampiran(null);
+    setSibukLampiran(l.id);
+    try {
+      await api(`${base}/${leaveId}/lampiran/${l.id}`, { method: "DELETE" });
+      await load();
+    } catch (e) {
+      setGalatLampiran({ id: leaveId, pesan: e instanceof Error ? e.message : "Gagal menghapus lampiran." });
+    } finally {
+      setSibukLampiran(null);
     }
   }
 
@@ -73,8 +163,14 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
       <Card
         title="Pengajuan izin"
         action={
-          <button onClick={() => setOpen((o) => !o)} className="btn-ghost h-9 text-xs">
-            <IconPlus className="text-[15px]" /> {open ? "Tutup" : "Ajukan"}
+          <button
+            onClick={() => {
+              setOpen((o) => !o);
+              setOk("");
+            }}
+            className="btn-ghost h-9 text-xs"
+          >
+            {open ? <IconX className="text-[15px]" /> : <IconPlus className="text-[15px]" />} {open ? "Tutup" : "Ajukan"}
           </button>
         }
       >
@@ -144,8 +240,10 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
               />
             </label>
 
+            <PilihLampiran nilai={lampiran} onUbah={setLampiran} disabled={busy} />
+
             <button onClick={submit} disabled={busy} className="btn-primary h-11 w-full">
-              {busy ? "Mengirim…" : "Kirim Pengajuan"}
+              {busy ? (lampiran.length > 0 ? "Mengirim pengajuan & lampiran…" : "Mengirim…") : "Kirim Pengajuan"}
             </button>
             <p className="text-center text-xs text-subtle">
               Absensi Anda baru berubah setelah owner menyetujui pengajuan ini.
@@ -176,6 +274,24 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
                   <LeaveStatusBadge status={r.status} />
                 </div>
                 <p className="mt-1 text-sm text-muted">{r.reason}</p>
+                <DaftarLampiran
+                  lampiran={r.lampiran ?? []}
+                  urlDari={urlLampiran(r.id)}
+                  onHapus={bolehUbah && r.status === "pending" ? (l) => hapusLampiran(r.id, l) : undefined}
+                  sibuk={sibukLampiran}
+                />
+                {bolehUbah && r.status === "pending" && (r.lampiran?.length ?? 0) < LAMPIRAN_MAKS_JUMLAH && (
+                  <TambahLampiran
+                    sisa={LAMPIRAN_MAKS_JUMLAH - (r.lampiran?.length ?? 0)}
+                    sibuk={sibukLampiran === r.id}
+                    onPilih={(files) => tambahLampiran(r.id, files)}
+                  />
+                )}
+                {galatLampiran?.id === r.id && (
+                  <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs text-danger">
+                    <IconAlert className="mt-px shrink-0 text-[14px]" /> {galatLampiran.pesan}
+                  </p>
+                )}
                 {r.decisionNote && (
                   <p className="mt-1.5 rounded-lg border border-border p-2 text-xs text-muted">
                     <b className="text-fg">Catatan owner:</b> {r.decisionNote}
@@ -195,5 +311,36 @@ export function LeavePanel({ token, ownerQuery = "" }: { token: string; ownerQue
         )}
       </Card>
     </div>
+  );
+}
+
+/** Tombol kecil "Tambah lampiran" di riwayat (pengajuan yang masih menunggu). */
+function TambahLampiran({ sisa, sibuk, onPilih }: { sisa: number; sibuk: boolean; onPilih: (f: File[]) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        multiple
+        accept={TERIMA_LAMPIRAN}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => {
+          const f = [...(e.target.files ?? [])].slice(0, sisa);
+          e.target.value = "";
+          if (f.length) onPilih(f);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        disabled={sibuk}
+        className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-60"
+      >
+        <IconPlus className="text-[13px]" /> {sibuk ? "Mengirim lampiran…" : `Tambah lampiran (foto/PDF, sisa ${sisa})`}
+      </button>
+    </>
   );
 }

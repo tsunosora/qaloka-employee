@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireManager, json, route } from "@/lib/http";
 import { countDays } from "@/lib/services/leave/range";
 import { toYmd } from "@/lib/services/leave/service";
+import { metaLampiran } from "@/lib/services/leave/lampiran";
 
 const STATUSES = new Set(["pending", "approved", "rejected", "cancelled"]);
 
@@ -29,6 +30,7 @@ export const GET = route(async (req: Request) => {
       include: {
         employee: { select: { id: true, fullName: true, employeeCode: true, department: { select: { name: true } } } },
         decidedBy: { select: { name: true } },
+        lampiran: { select: { id: true, nama: true, tipe: true, ukuran: true }, orderBy: { id: "asc" } },
       },
     }),
     prisma.leaveRequest.count({ where }),
@@ -53,6 +55,7 @@ export const GET = route(async (req: Request) => {
       decidedAt: r.decidedAt,
       decidedBy: r.decidedBy?.name ?? null,
       createdAt: r.createdAt,
+      lampiran: r.lampiran.map(metaLampiran),
     })),
     total,
     page,

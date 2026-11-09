@@ -10,7 +10,7 @@ import { SetelanHariTugas } from "@/components/magang/SetelanHariTugas";
 import { namaHariTugas } from "@/lib/services/magang/nilai";
 import { ChipStatus, Judul, Kosong, Memuat, Pesan, tglPendek, warnaNilai, type StatusTugas } from "@/components/magang/ui";
 import { daftarSekolah, sekolahSama } from "@/lib/services/magang/sekolah";
-import { labelSingkatKategori } from "@/lib/services/magang/rapor";
+import { labelSingkatKategori } from "@/lib/services/magang/misi";
 
 type Anak = {
   id: number;
@@ -27,7 +27,7 @@ type Anak = {
   rataNilai: number | null;
   adaRotasi: boolean;
   jurnalHariIni: boolean;
-  sideQuest: { kategori: { kategori: string; selesai: number; total: number }[]; menunggu: number; selesai: number; total: number } | null;
+  sideQuest: { kategori: { kategori: string; label: string; selesai: number; total: number }[]; menunggu: number; selesai: number; total: number } | null;
 };
 type Ringkasan = {
   hariIni: string;
@@ -246,11 +246,12 @@ export default function MagangPage() {
                           {p.sideQuest.kategori.map((k) => (
                             <li
                               key={k.kategori}
+                              title={k.label}
                               className={`rounded-full border px-2 py-0.5 text-xs ${
                                 k.total > 0 && k.selesai >= k.total ? "border-success text-success" : "border-border text-muted"
                               }`}
                             >
-                              {labelSingkatKategori(k.kategori)} <b className="text-fg">{k.selesai}</b>/{k.total}
+                              {labelSingkatKategori(k.label)} <b className="text-fg">{k.selesai}</b>/{k.total}
                             </li>
                           ))}
                         </ul>

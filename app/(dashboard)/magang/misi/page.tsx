@@ -7,7 +7,8 @@ import { IconPencil, IconPlus, IconTrash } from "@/components/ui/icons";
 import { Judul, Kosong, Memuat, Pesan } from "@/components/magang/ui";
 import { KartuKiriman, type KirimanAdmin } from "@/components/magang/KirimanMisi";
 import { daftarSekolah, sekolahSama } from "@/lib/services/magang/sekolah";
-import { KATEGORI_MISI, LEVEL_MISI, JENIS_BUKTI, type JenisBukti, type KategoriMisi, type LevelMisi } from "@/lib/services/magang/misi";
+import { KelolaKategori, type KategoriAdmin } from "@/components/magang/KategoriMisi";
+import { KATEGORI_AWAL, LEVEL_MISI, JENIS_BUKTI, type JenisBukti, type LevelMisi } from "@/lib/services/magang/misi";
 
 type Misi = {
   id: number;
@@ -27,7 +28,7 @@ type Bank = { misi: Misi[] };
 
 type FormMisi = {
   id?: number;
-  kategori: KategoriMisi;
+  kategori: string;
   level: LevelMisi;
   judul: string;
   deskripsi: string;
@@ -45,14 +46,22 @@ export default function SideQuestPage() {
   const [form, setForm] = useState<FormMisi | null>(null);
   const [busy, setBusy] = useState(false);
   const [sekolah, setSekolah] = useState(""); // kunci sekolah, "" = semua
+  const [kategori, setKategori] = useState<KategoriAdmin[] | null>(null);
+  const [kelolaKategori, setKelolaKategori] = useState(false);
 
   const ambil = useCallback(
-    () => Promise.all([api<Bank>("/api/magang/misi"), api<{ kiriman: KirimanAdmin[] }>("/api/magang/misi/kiriman?status=menunggu")]),
+    () =>
+      Promise.all([
+        api<Bank>("/api/magang/misi"),
+        api<{ kiriman: KirimanAdmin[] }>("/api/magang/misi/kiriman?status=menunggu"),
+        api<{ kategori: KategoriAdmin[] }>("/api/magang/misi/kategori"),
+      ]),
     []
   );
-  const pasang = ([b, k]: [Bank, { kiriman: KirimanAdmin[] }]) => {
+  const pasang = ([b, k, kat]: [Bank, { kiriman: KirimanAdmin[] }, { kategori: KategoriAdmin[] }]) => {
     setBank(b);
     setKiriman(k.kiriman);
+    setKategori(kat.kategori);
   };
   const gagal = (e: unknown) => setGalat(e instanceof Error ? e.message : "Gagal memuat data.");
   const muat = () => ambil().then(pasang, gagal);
@@ -95,31 +104,57 @@ export default function SideQuestPage() {
     if (ok) setForm(null);
   }
 
-  const misiBaru = (kategori: KategoriMisi = "cs"): FormMisi => ({
-    kategori,
+  const kategoriAktif = kategori?.filter((k) => k.aktif) ?? [];
+  const misiBaru = (kunci: string = kategoriAktif[0]?.kunci ?? ""): FormMisi => ({
+    kategori: kunci,
     level: "dasar",
     judul: "",
     deskripsi: "",
     bukti: ["foto"],
     poin: 10,
-    urutan: (bank?.misi.filter((m) => m.kategori === kategori).length ?? 0) + 1,
+    urutan: (bank?.misi.filter((m) => m.kategori === kunci).length ?? 0) + 1,
     aktif: true,
   });
 
   const pilihanSekolah = daftarSekolah((kiriman ?? []).map((k) => k.peserta.sekolah));
   const sekolahAktif = pilihanSekolah.some((s) => s.kunci === sekolah) ? sekolah : "";
   const antrean = kiriman?.filter((k) => !sekolahAktif || sekolahSama(k.peserta.sekolah, sekolahAktif)) ?? null;
-  const misiTanpaKategori = bank?.misi.filter((m) => !KATEGORI_MISI.some((k) => k.key === m.kategori)) ?? [];
+  const misiTanpaKategori = bank?.misi.filter((m) => !kategori?.some((k) => k.kunci === m.kategori)) ?? [];
+  // Bank: kategori aktif selalu tampil (supaya bisa "Tambah"); kategori nonaktif hanya bila masih ada misinya.
+  const kelompok = (kategori ?? []).filter((k) => k.aktif || bank?.misi.some((m) => m.kategori === k.kunci));
+  // Pilihan Kategori di formulir: yang aktif + kategori misi yang sedang disunting (walau nonaktif).
+  const pilihanKategori = (kategori ?? []).filter((k) => k.aktif || k.kunci === form?.kategori);
+  const ubahMisi = (m: Misi) =>
+    setForm({
+      id: m.id,
+      kategori: m.kategori,
+      level: m.level,
+      judul: m.judul,
+      deskripsi: m.deskripsi ?? "",
+      bukti: m.bukti,
+      poin: m.poin,
+      urutan: m.urutan,
+      aktif: m.aktif,
+    });
+  const hapusMisi = (m: Misi) => {
+    if (confirm(`Hapus misi "${m.judul}"? Bukti yang sudah dikirim anak tetap tersimpan, tapi misi ini tidak lagi diberikan.`))
+      jalankan(() => api(`/api/magang/misi/${m.id}`, { method: "DELETE" }), `Misi "${m.judul}" dihapus.`);
+  };
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <Judul
         judul="Side Quest"
-        keterangan="Misi wajib di luar rotasi pos — Customer Service, Desain Grafis, Digital Marketing. Misi yang aktif otomatis berlaku untuk semua anak magang. Anak mengirim bukti dari HP; periksa di sini lalu setujui atau minta perbaikan."
+        keterangan="Misi wajib di luar rotasi pos, dikelompokkan per kategori (atur lewat tombol Kategori). Misi yang aktif otomatis berlaku untuk semua anak magang. Anak mengirim bukti dari HP; periksa di sini lalu setujui atau minta perbaikan."
         aksi={
-          <button onClick={() => setForm(misiBaru())} className="btn-primary h-11 text-sm" disabled={!bank}>
-            <IconPlus className="text-[16px]" /> Tambah misi
-          </button>
+          <>
+            <button onClick={() => setKelolaKategori(true)} className="btn-ghost h-11 text-sm" disabled={!kategori}>
+              Kategori{kategori ? ` (${kategori.length})` : ""}
+            </button>
+            <button onClick={() => setForm(misiBaru())} className="btn-primary h-11 text-sm" disabled={!bank || !kategori}>
+              <IconPlus className="text-[16px]" /> Tambah misi
+            </button>
+          </>
         }
       />
       <div aria-live="polite" className="space-y-2">
@@ -179,7 +214,7 @@ export default function SideQuestPage() {
           <div className="glass rounded-2xl p-8 text-center">
             <p className="text-sm text-muted">Belum ada misi side quest.</p>
             <p className="mx-auto mt-1 max-w-md text-xs text-subtle">
-              Mulai dari bank misi awal (Customer Service, Desain Grafis, Digital Marketing; dasar sampai lanjut) — semuanya bisa disunting atau dinonaktifkan.
+              Mulai dari bank misi awal ({KATEGORI_AWAL.map((k) => k.nama).join(", ")}; dasar sampai lanjut) — semuanya bisa disunting atau dinonaktifkan.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <button
@@ -196,51 +231,38 @@ export default function SideQuestPage() {
           </div>
         ) : (
           <>
-            {KATEGORI_MISI.map((kat) => {
-              const daftar = bank.misi.filter((m) => m.kategori === kat.key);
+            {kelompok.map((kat) => {
+              const daftar = bank.misi.filter((m) => m.kategori === kat.kunci);
               const aktif = daftar.filter((m) => m.aktif).length;
               return (
-                <div key={kat.key} className="glass rounded-2xl p-4">
+                <div key={kat.kunci} className={`glass rounded-2xl p-4 ${kat.aktif ? "" : "opacity-70"}`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <h3 className="font-display font-bold text-fg">
-                        {kat.label}{" "}
-                        <span className="ml-1 rounded-full border border-border px-2 py-0.5 align-middle text-xs font-semibold text-muted">Prioritas {kat.prioritas}</span>
+                        {kat.nama}{" "}
+                        {kat.prioritas && (
+                          <span className="ml-1 rounded-full border border-border px-2 py-0.5 align-middle text-xs font-semibold text-muted">Prioritas {kat.prioritas}</span>
+                        )}
+                        {!kat.aktif && (
+                          <span className="ml-1 rounded-full border border-border px-2 py-0.5 align-middle text-xs font-semibold text-subtle">Kategori nonaktif</span>
+                        )}
                       </h3>
                       <p className="text-xs text-muted">
-                        {kat.ringkas} · {aktif} misi aktif
+                        {[kat.ringkas, kat.aktif ? `${aktif} misi aktif` : "misinya tidak diberikan ke anak — aktifkan lewat tombol Kategori"].filter(Boolean).join(" · ")}
                       </p>
                     </div>
-                    <button className="btn-ghost h-11 px-3 text-sm" onClick={() => setForm(misiBaru(kat.key))} aria-label={`Tambah misi ${kat.label}`}>
-                      <IconPlus /> Tambah
-                    </button>
+                    {kat.aktif && (
+                      <button className="btn-ghost h-11 px-3 text-sm" onClick={() => setForm(misiBaru(kat.kunci))} aria-label={`Tambah misi ${kat.nama}`}>
+                        <IconPlus /> Tambah
+                      </button>
+                    )}
                   </div>
                   {daftar.length === 0 ? (
                     <p className="mt-3 text-sm text-subtle">Belum ada misi di kategori ini.</p>
                   ) : (
                     <ul className="mt-3 space-y-2">
                       {daftar.map((m) => (
-                        <BarisMisi
-                          key={m.id}
-                          m={m}
-                          onUbah={() =>
-                            setForm({
-                              id: m.id,
-                              kategori: m.kategori as KategoriMisi,
-                              level: m.level,
-                              judul: m.judul,
-                              deskripsi: m.deskripsi ?? "",
-                              bukti: m.bukti,
-                              poin: m.poin,
-                              urutan: m.urutan,
-                              aktif: m.aktif,
-                            })
-                          }
-                          onHapus={() => {
-                            if (confirm(`Hapus misi "${m.judul}"? Bukti yang sudah dikirim anak tetap tersimpan, tapi misi ini tidak lagi diberikan.`))
-                              jalankan(() => api(`/api/magang/misi/${m.id}`, { method: "DELETE" }), `Misi "${m.judul}" dihapus.`);
-                          }}
-                        />
+                        <BarisMisi key={m.id} m={m} onUbah={() => ubahMisi(m)} onHapus={() => hapusMisi(m)} />
                       ))}
                     </ul>
                   )}
@@ -256,7 +278,7 @@ export default function SideQuestPage() {
                       key={m.id}
                       m={m}
                       onUbah={() => setForm({ ...misiBaru(), id: m.id, judul: m.judul, deskripsi: m.deskripsi ?? "", level: m.level, bukti: m.bukti, poin: m.poin, urutan: m.urutan, aktif: m.aktif })}
-                      onHapus={() => confirm(`Hapus misi "${m.judul}"?`) && jalankan(() => api(`/api/magang/misi/${m.id}`, { method: "DELETE" }), `Misi "${m.judul}" dihapus.`)}
+                      onHapus={() => hapusMisi(m)}
                     />
                   ))}
                 </ul>
@@ -292,10 +314,16 @@ export default function SideQuestPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="text-sm font-semibold text-fg">Kategori</span>
-                <select className="input mt-1.5 h-11" value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value as KategoriMisi })}>
-                  {KATEGORI_MISI.map((k) => (
-                    <option key={k.key} value={k.key}>
-                      {k.label}
+                <select className="input mt-1.5 h-11" value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })}>
+                  {!form.kategori && (
+                    <option value="" disabled>
+                      Pilih kategori
+                    </option>
+                  )}
+                  {pilihanKategori.map((k) => (
+                    <option key={k.kunci} value={k.kunci}>
+                      {k.nama}
+                      {k.aktif ? "" : " (nonaktif)"}
                     </option>
                   ))}
                 </select>
@@ -358,16 +386,30 @@ export default function SideQuestPage() {
               <button className="btn-ghost h-11 text-sm" onClick={() => setForm(null)}>
                 Batal
               </button>
-              <button className="btn-primary h-11 text-sm" onClick={simpan} disabled={busy || form.judul.trim().length < 3 || form.bukti.length === 0}>
+              <button
+                className="btn-primary h-11 text-sm"
+                onClick={simpan}
+                disabled={busy || !form.kategori || form.judul.trim().length < 3 || form.bukti.length === 0}
+              >
                 {busy ? "Menyimpan…" : "Simpan"}
               </button>
             </div>
-            {(form.judul.trim().length < 3 || form.bukti.length === 0) && (
+            {(!form.kategori || form.judul.trim().length < 3 || form.bukti.length === 0) && (
               <p className="text-right text-xs text-muted">
-                {form.judul.trim().length < 3 ? "Judul minimal 3 huruf." : "Pilih minimal satu jenis bukti."}
+                {!form.kategori
+                  ? "Belum ada kategori aktif — tambahkan atau aktifkan lewat tombol Kategori."
+                  : form.judul.trim().length < 3
+                    ? "Judul minimal 3 huruf."
+                    : "Pilih minimal satu jenis bukti."}
               </p>
             )}
           </div>
+        </Modal>
+      )}
+
+      {kelolaKategori && kategori && (
+        <Modal title="Kategori side quest" size="xl" onClose={() => setKelolaKategori(false)}>
+          <KelolaKategori kategori={kategori} onBerubah={muat} />
         </Modal>
       )}
     </div>

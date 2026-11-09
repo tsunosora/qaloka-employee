@@ -6,8 +6,8 @@ import { kirimMisiSchema } from "@/lib/validators/magang";
 import { medanForm } from "@/lib/services/reimbursement/service";
 import { daftarFoto } from "@/lib/services/magang/jurnal";
 import { fotoDariForm, hapusFoto } from "@/lib/services/magang/foto";
-import { bolehKirimMisi, periksaBukti, progresMisi, uraiBukti, KATEGORI_MISI, MAKS_FOTO_MISI, MIN_TEKS_MISI } from "@/lib/services/magang/misi";
-import { misiAktif, serialisasiMisi, serialisasiKiriman, includePengurus } from "@/lib/services/magang/misi-db";
+import { bolehKirimMisi, periksaBukti, progresMisi, uraiBukti, MAKS_FOTO_MISI, MIN_TEKS_MISI } from "@/lib/services/magang/misi";
+import { kategoriDanPeta, misiAktif, serialisasiMisi, serialisasiKiriman, includePengurus } from "@/lib/services/magang/misi-db";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -21,20 +21,22 @@ export const GET = route<Ctx>(async (req, ctx) => {
   const employee = await requirePortalSession(token, req);
   const p = await pesertaDari(employee.id);
   if (!p) return json({ peserta: false });
-  const [misi, kiriman] = await Promise.all([
+  const [misi, kiriman, { kategori, peta }] = await Promise.all([
     misiAktif(prisma),
     prisma.magangMisiKiriman.findMany({ where: { pesertaId: p.id }, include: includePengurus }),
+    kategoriDanPeta(prisma),
   ]);
   const milik = new Map(kiriman.map((k) => [k.misiId, k]));
   return json({
     peserta: true,
-    kategori: KATEGORI_MISI,
+    // Hanya kategori AKTIF (urut tampilan) — misi di kategori nonaktif tidak diberikan (lihat misiAktif).
+    kategori: kategori.filter((k) => k.aktif).map((k) => ({ kunci: k.kunci, nama: k.nama, ringkas: k.ringkas, prioritas: k.prioritas })),
     maksFoto: MAKS_FOTO_MISI,
     minTeks: MIN_TEKS_MISI,
-    progres: progresMisi(misi, kiriman),
+    progres: progresMisi(misi, kiriman, kategori),
     misi: misi.map((m) => {
       const k = milik.get(m.id);
-      return { ...serialisasiMisi(m), kiriman: k ? serialisasiKiriman(k) : null };
+      return { ...serialisasiMisi(m, peta), kiriman: k ? serialisasiKiriman(k) : null };
     }),
   });
 });
@@ -52,7 +54,7 @@ export const POST = route<Ctx>(async (req, ctx) => {
   if (!parsed.success) return badRequest(parsed.error.flatten());
   const d = parsed.data;
 
-  const misi = await prisma.magangMisi.findFirst({ where: { id: d.misiId, aktif: true, deletedAt: null } });
+  const misi = await prisma.magangMisi.findFirst({ where: { id: d.misiId, aktif: true, deletedAt: null, kategoriRef: { aktif: true } } });
   if (!misi) return NextResponse.json({ message: "Misi ini sudah tidak tersedia." }, { status: 404 });
   const lama = await prisma.magangMisiKiriman.findUnique({ where: { misiId_pesertaId: { misiId: misi.id, pesertaId: p.id } } });
   if (!bolehKirimMisi(lama?.status)) return NextResponse.json({ message: "Misi ini sudah disetujui, tidak bisa diubah lagi." }, { status: 409 });
