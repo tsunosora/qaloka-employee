@@ -7,7 +7,7 @@ import { PinGate } from "@/components/portal/PinGate";
 import { NamaMerek, UbinLogo } from "@/components/QendaliMark";
 import { IconAlert, IconCheck, IconClock } from "@/components/ui/icons";
 import type { PortalState } from "@/components/portal/types";
-import { bacaLokasi, idPerangkat, jamDari, kecilkan, teksJarak } from "@/components/absen/peramban";
+import { bacaLokasi, idPerangkat, jamDari, kecilkan, pesanDari, pesanFotoGagal, teksJarak } from "@/components/absen/peramban";
 import { RekapTim } from "@/components/absen/RekapTim";
 
 type Absen = {
@@ -73,9 +73,9 @@ export default function AbsenPage({ params }: { params: Promise<{ token: string 
     let foto: Blob;
     try {
       foto = await kecilkan(f);
-    } catch {
+    } catch (err) {
       setLangkah("diam");
-      return setPesan({ ok: false, teks: "Foto tidak terbaca. Coba ambil ulang." });
+      return setPesan({ ok: false, teks: pesanFotoGagal(err, f) });
     }
     setLangkah("lokasi");
     try {
@@ -105,6 +105,14 @@ export default function AbsenPage({ params }: { params: Promise<{ token: string 
     try {
       const r = await fetch(`/api/public/absen/${token}/absen`, { method: "POST", body: fd });
       const d = (await r.json().catch(() => ({}))) as Terima | Tolak;
+      if (r.status === 401) {
+        // Sesi PIN habis (8 jam) — dulu tampil "Absen gagal" tanpa penjelasan. Tampilkan layar PIN lagi.
+        tertunda.current = null;
+        setLangkah("diam");
+        setPesan({ ok: false, teks: "Sesi Anda sudah habis. Masukkan PIN lagi, lalu ulangi absen." });
+        await muat();
+        return;
+      }
       if (d.ok && d.menunggu) {
         tertunda.current = null;
         setAlasan("");
@@ -137,7 +145,7 @@ export default function AbsenPage({ params }: { params: Promise<{ token: string 
       } else {
         tertunda.current = null;
         setLangkah("diam");
-        setPesan({ ok: false, teks: (d as Tolak).alasan || "Absen gagal. Coba lagi." });
+        setPesan({ ok: false, teks: pesanDari(d, `Absen gagal (kode ${r.status}). Coba lagi.`) });
       }
     } catch {
       setLangkah("diam");
