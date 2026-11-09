@@ -22,11 +22,19 @@ export function keYmd(p: { id: number; pesertaId: number; posId: number; mulai: 
 }
 
 /**
- * Susun ulang rotasi mulai Senin minggu `dari`. Penugasan yang MULAI sebelum `dari` dipertahankan
- * (riwayat + yang sedang berjalan); yang mulai ≥ dari dihapus lalu disusun lagi. Tugas mingguan
- * tidak terhubung ke baris penugasan, jadi tidak ada nilai yang hilang.
+ * Susun ulang rotasi mulai Senin minggu `dari`.
+ * - mode "semua": penugasan yang MULAI sebelum `dari` dipertahankan (riwayat + yang sedang berjalan);
+ *   yang mulai ≥ dari dihapus lalu disusun lagi untuk semua peserta aktif.
+ * - mode "baru": hanya `pesertaIds` (atau, bila kosong, peserta aktif yang belum punya jadwal sejak
+ *   `dari`) yang disusun. Jadwal anak lain — termasuk yang sesudah `dari` — TIDAK disentuh dan ikut
+ *   dihitung sebagai isi pos. Untuk rombongan baru yang masuk di tengah program.
+ * Tugas mingguan tidak terhubung ke baris penugasan, jadi tidak ada nilai yang hilang.
  */
-export async function susunUlang(db: PrismaClient, dariInput: string): Promise<{ dibuat: number; dari: string }> {
+export async function susunUlang(
+  db: PrismaClient,
+  dariInput: string,
+  opsi: { mode?: "semua" | "baru"; pesertaIds?: readonly number[] } = {}
+): Promise<{ dibuat: number; dari: string; disusun: number }> {
   const dari = seninDari(dariInput);
   const [peserta, pos] = await Promise.all([
     db.magangPeserta.findMany({
@@ -40,26 +48,44 @@ export async function susunUlang(db: PrismaClient, dariInput: string): Promise<{
     }),
   ]);
   const ids = peserta.map((p) => p.id);
-  const ada = (
-    await db.magangPenugasan.findMany({
-      where: { pesertaId: { in: ids }, mulai: { lt: atMidnight(dari) } },
-    })
-  ).map(keYmd);
+  const semuaPen = (await db.magangPenugasan.findMany({ where: { pesertaId: { in: ids } } })).map(keYmd);
+
+  const target = opsi.mode === "baru" ? pilihTargetBaru(ids, semuaPen, dari, opsi.pesertaIds) : ids;
+  if (target.length === 0) return { dibuat: 0, dari, disusun: 0 };
+  const targetSet = new Set(target);
+  // Dipertahankan: semua jadwal anak non-target + jadwal target yang mulai sebelum `dari`.
+  const ada = semuaPen.filter((a) => !targetSet.has(a.pesertaId) || a.mulai < dari);
 
   const baru = susunRotasi({
     pos,
     peserta: peserta.map((p) => ({ id: p.id, mulai: toYmd(p.mulai), selesai: p.selesai ? toYmd(p.selesai) : null })),
     ada: ada as PenugasanAda[],
     dari,
+    hanya: opsi.mode === "baru" ? target : undefined,
   });
 
   await db.$transaction([
-    db.magangPenugasan.deleteMany({ where: { pesertaId: { in: ids }, mulai: { gte: atMidnight(dari) } } }),
+    db.magangPenugasan.deleteMany({ where: { pesertaId: { in: target }, mulai: { gte: atMidnight(dari) } } }),
     db.magangPenugasan.createMany({
       data: baru.map((b) => ({ pesertaId: b.pesertaId, posId: b.posId, mulai: atMidnight(b.mulai), minggu: b.minggu, berbagi: b.berbagi })),
     }),
   ]);
-  return { dibuat: baru.length, dari };
+  return { dibuat: baru.length, dari, disusun: target.length };
+}
+
+/**
+ * Peserta yang disusun pada mode "baru": `diminta` (yang aktif saja) bila diisi; bila tidak, peserta
+ * aktif yang TIDAK punya penugasan apa pun yang masih berjalan pada/sesudah minggu `dari`. MURNI.
+ */
+export function pilihTargetBaru(
+  aktif: readonly number[],
+  penugasan: readonly { pesertaId: number; mulai: string; minggu: number }[],
+  dari: string,
+  diminta?: readonly number[]
+): number[] {
+  if (diminta && diminta.length) return aktif.filter((id) => diminta.includes(id));
+  const punya = new Set(penugasan.filter((a) => tambahMinggu(a.mulai, a.minggu) > dari).map((a) => a.pesertaId));
+  return aktif.filter((id) => !punya.has(id));
 }
 
 export function soalDariBaris(s: { id: number; pertanyaan: string; pilihan: Prisma.JsonValue; benar: number }): SoalBank {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MAKS_INGATAN, MIN_INGATAN } from "@/lib/services/magang/nilai";
 import { MIN_KEGIATAN, MAKS_KEGIATAN } from "@/lib/services/magang/jurnal";
+import { KUNCI_BUKTI, KUNCI_KATEGORI, KUNCI_LEVEL, MAKS_TEKS_MISI } from "@/lib/services/magang/misi";
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD");
 const teksOpsional = (maks: number) =>
@@ -18,6 +19,7 @@ export const posSchema = z.object({
   kapasitas: z.number().int().min(1).max(10).default(1),
   urutan: z.number().int().min(0).max(999).default(0),
   pembimbingId: z.number().int().positive().nullable().optional(),
+  lokasi: teksOpsional(80),
   aktif: z.boolean().default(true),
 });
 
@@ -36,6 +38,8 @@ export const pesertaSchema = z
     employeeId: z.number().int().positive(),
     sekolah: teksOpsional(150),
     jurusan: teksOpsional(100),
+    guruPembimbing: teksOpsional(150),
+    kontakGuru: teksOpsional(60),
     mulai: ymd,
     selesai: ymd.nullable().optional(),
     aktif: z.boolean().default(true),
@@ -43,8 +47,17 @@ export const pesertaSchema = z
   })
   .refine((p) => !p.selesai || p.selesai >= p.mulai, { message: "Tanggal selesai sebelum tanggal mulai", path: ["selesai"] });
 
-/** Susun ulang rotasi mulai Senin minggu `dari` (penugasan sebelumnya dipertahankan). */
-export const susunSchema = z.object({ dari: ymd });
+/**
+ * Susun rotasi mulai Senin minggu `dari`.
+ * - mode "semua" (bawaan, perilaku lama): semua peserta aktif disusun ulang dari `dari`.
+ * - mode "baru": HANYA peserta yang belum punya jadwal sejak `dari` (atau `pesertaIds` bila diisi) yang
+ *   disusun; jadwal anak lain TIDAK berubah dan dihitung sebagai isi pos (kapasitas tetap dihormati).
+ */
+export const susunSchema = z.object({
+  dari: ymd,
+  mode: z.enum(["semua", "baru"]).default("semua"),
+  pesertaIds: z.array(z.number().int().positive()).max(200).optional(),
+});
 
 /** Ganti pos satu penugasan dengan tangan. */
 export const ubahPenugasanSchema = z.object({
@@ -103,6 +116,7 @@ export const tautanDaftarSchema = z
     berlakuSampai: ymd,
     mulaiMagang: ymd.nullable().optional(),
     selesaiMagang: ymd.nullable().optional(),
+    sekolah: teksOpsional(150),
   })
   .refine((d) => !d.mulaiMagang || !d.selesaiMagang || d.selesaiMagang >= d.mulaiMagang, {
     message: "Tanggal selesai sebelum tanggal mulai",
@@ -123,6 +137,8 @@ export const pendaftaranSchema = z
       .transform((v) => v.replace(/[\s-]/g, "")),
     sekolah: z.string().trim().min(2, "Tulis nama sekolah/kampus").max(150),
     jurusan: teksOpsional(100),
+    guruPembimbing: teksOpsional(150),
+    kontakGuru: teksOpsional(60),
     mulai: ymd,
     selesai: ymd.nullable().optional(),
     pin: pinMentah,
@@ -143,8 +159,38 @@ export const pesertaBaruSchema = z
     hp: teksOpsional(30),
     sekolah: teksOpsional(150),
     jurusan: teksOpsional(100),
+    guruPembimbing: teksOpsional(150),
+    kontakGuru: teksOpsional(60),
     mulai: ymd,
     selesai: ymd.nullable().optional(),
     catatan: teksOpsional(2000),
   })
   .refine((p) => !p.selesai || p.selesai >= p.mulai, { message: "Tanggal selesai sebelum tanggal mulai", path: ["selesai"] });
+
+// ── Side quest (9 Nov 2026) ───────────────────────────────────────────────────────────────────
+
+export const misiSchema = z.object({
+  kategori: z.enum(KUNCI_KATEGORI),
+  level: z.enum(KUNCI_LEVEL).default("dasar"),
+  judul: z.string().trim().min(3, "Judul minimal 3 huruf").max(150),
+  deskripsi: teksOpsional(4000),
+  bukti: z.array(z.enum(KUNCI_BUKTI)).min(1, "Pilih minimal satu jenis bukti").max(3),
+  poin: z.number().int().min(0).max(1000).default(10),
+  urutan: z.number().int().min(0).max(999).default(0),
+  aktif: z.boolean().default(true),
+});
+
+/** Bukti misi dari portal (multipart → objek). hapusFoto = indeks foto lama yang dibuang, mis. "0,2". */
+export const kirimMisiSchema = z.object({
+  misiId: z.coerce.number().int().positive(),
+  teks: teksOpsional(MAKS_TEKS_MISI),
+  tautan: teksOpsional(500),
+  hapusFoto: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(",").map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < 10) : [])),
+});
+
+export const putusMisiSchema = z
+  .object({ aksi: z.enum(["setujui", "tolak"]), catatan: teksOpsional(2000) })
+  .refine((d) => d.aksi !== "tolak" || !!d.catatan, { message: "Tulis apa yang perlu diperbaiki", path: ["catatan"] });
