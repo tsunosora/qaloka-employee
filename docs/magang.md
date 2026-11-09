@@ -218,3 +218,50 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
   401, dasbor tanpa login 302; /me /absen /login 200; log galat tidak bertambah; absensi hari ini (Fingerspot 16, HP 7) & jurnal (4)
   identik. Unggah lampiran SAH sengaja tidak diuji di produksi (akan membuat pengajuan sungguhan + notifikasi manajer; tidak ada rute
   hapus pengajuan) — diuji di DB uji lokal.
+
+## Pantauan guru sekolah (feat/magang-pantau-guru — BELUM dideploy)
+
+Guru pembimbing dari sekolah memantau anak sekolahnya sendiri lewat tautan + PIN, **hanya melihat**.
+
+- **Model** `MagangPantau` (migrasi `20261111000000_magang_pantau_guru`, hanya MENAMBAH satu tabel): `sekolahKunci`
+  (= `kunciSekolah()`), `sekolahLabel`, `token` unik (32 bita acak base64url), `pinHash` (bcrypt, PIN 6–8 angka dari admin),
+  `aktif`, `kedaluwarsa` (opsional, berlaku s.d. akhir hari itu), `tampilLampiranIzin` (bawaan mati), `terakhirDibukaAt`,
+  `dibukaKali`, `dicabutAt`, `dibuatOlehId` (User, SetNull). Kolom tambahan `kunciAktif` (unik; = sekolahKunci selama aktif,
+  NULL sesudah dicabut) menjamin **satu tautan aktif per sekolah** di tingkat DB.
+- **Admin** Magang → **Sekolah** (`/magang/sekolah`, `requireManager`): sekolah dari semua peserta (aktif & nonaktif) dikelompokkan
+  `daftarSekolah()` — jumlah anak, rentang mulai–selesai, nama guru pembimbing, *Cetak rapor sekolah*. Panel tautan: buat (PIN
+  ditampilkan sekali, kedaluwarsa terisi tanggal selesai terakhir, centang lampiran), salin tautan, dibuka N× / terakhir, ubah tanggal,
+  nyalakan/matikan lampiran, ganti PIN, **ganti tautan** (cabut + buat baru, PIN tetap), **cabut**. API: `GET/POST /api/magang/pantau`,
+  `PATCH /api/magang/pantau/[id] {pin?, kedaluwarsa?, tampilLampiranIzin?}`, `POST …/[id]/cabut`, `POST …/[id]/ganti {pin?}`.
+  pinHash tidak pernah dikirim; token penuh hanya ke manajer.
+- **Guru** `/pantau/<token>` (bebas login di `proxy.ts`; lisensi `hr.assessment`): layar PIN → kepala (sekolah + nama usaha) →
+  saringan tanggal (bawaan awal magang → hari ini; *Semua / Minggu ini / Bulan ini* / tanggal bebas) → kartu anak (pos minggu ini +
+  lokasi, kehadiran %, jurnal x/y, side quest x/y) → detail (`#anak-<id>`, tombol Kembali peramban bekerja) dengan bagian terlipat:
+  Ringkasan (+ nilai per pos), Absensi (masuk/pulang, status, sumber HP/Mesin; HP: nama lokasi + jarak + foto), Jurnal (+ komentar
+  pembimbing, foto), Izin & sakit (lampiran hanya bila diizinkan), Pos & jadwal, Tugas mengingat (nilai, predikat, terlambat, catatan
+  pembimbing — BUKAN tulisan/jawaban kuis anak), Side quest (per kategori + judul misi disetujui, TANPA poin). Foto → lightbox.
+  *Cetak rekap anak* / *Cetak rekap sekolah* (satu anak per halaman, terang, tanpa foto) → simpan PDF lewat peramban.
+- **Rute publik** `/api/public/pantau/<token>`: `GET` (status), `POST masuk {pin}`, `POST keluar`, `GET anak?dari&sampai`,
+  `GET anak/[id]?dari&sampai`, berkas `anak/[id]/absen-foto/[buktiId]`, `anak/[id]/jurnal/[jurnalId]/foto/[n]`,
+  `anak/[id]/izin/[izinId]/lampiran/[lampiranId]`. Halaman `/pantau/<token>` selalu 200 (token tak berlaku → layar "Tautan tidak berlaku").
+- **Kehadiran %** (`pantau.ts hariKerjaAnak/hitungKehadiran`): hari kerja dari max(dari, mulai) s.d. min(sampai, hari ini, selesai),
+  Senin–Sabtu tanpa Holiday (aturan rapor/jurnal); hari sebelum mulai tidak dihitung; hari ini yang belum ada absen/izin belum dihitung;
+  absen di hari Minggu/libur ditampilkan "hadir (tidak dihitung)". Status per hari dari `aggregateAttendance` (laporan yang sama dengan
+  dasbor); karyawan nonaktif → dari scan mentah. Rekap dasbor admin tidak berubah.
+- **Keamanan**
+  - Token tak dikenal / dicabut / kedaluwarsa → 404 dengan pesan SAMA ("Tautan tidak berlaku. Minta tautan baru ke admin.").
+  - Cookie `rms_pantau` HttpOnly, SameSite=Lax, Secure di produksi, Path=/, 8 jam, HMAC(AUTH_SECRET) atas `{id, sidik token, sidik
+    pinHash, exp}`. Tiap permintaan memeriksa ulang DB: aktif, tidak dicabut, tidak kedaluwarsa, sidik token & PIN cocok → cabut /
+    ganti tautan / ganti PIN langsung mematikan sesi lama. Satu cookie per peramban (dua sekolah di peramban yang sama saling menimpa).
+  - Penahan PIN di **memori proses** (seperti `lib/rate-limit.ts`; hilang saat restart, cukup untuk satu instalasi PM2): 5 salah per
+    token+IP → 15 menit, plus batas 20 salah per token dari semua IP.
+  - Cakupan: anak = `sekolahSama(peserta.sekolah, sekolahKunci)` DAN karyawan tidak dihapus; id anak sekolah lain → 404; berkas
+    diperiksa milik anak itu → 404. Respons: `Cache-Control: no-store, private`, `X-Robots-Tag: noindex`, `nosniff`; halaman
+    `robots noindex`. Masuk/keluar boleh saat lisensi hanya-baca (seperti sesi portal).
+  - TIDAK pernah dikirim ke guru: nomor HP, publicToken, PIN/portalPin, kode karyawan/PIN mesin, gaji/upah, poin, karyawan lain,
+    catatan internal peserta, kontak guru, koordinat/perangkat/akurasi absen HP. Serializer menyusun objek baru dari medan yang diizinkan.
+- **Tes**: `tests/magang-pantau.test.ts` (cakupan antarsekolah & varian nama, tautan dicabut/kedaluwarsa/ganti, cookie token/PIN lama,
+  penahan PIN, kehadiran tanpa hari sebelum mulai/Minggu/libur, rute memeriksa sesi + cakupan, lisensi/proxy) dan
+  `tests/magang-pantau-serial.test.ts` (tidak ada kunci terlarang di JSON guru).
+- **Deploy**: `tools/magang/deploy-pantau-guru-voliko.sh <SHA>` (ff-only dari `abc2ee0`, cadangan DB+.env+storage, migrasi, build,
+  restart `ratemystaff` saja; hitungan data magang sebelum = sesudah; MagangPantau = 0; curl `/api/public/pantau/tidak-ada` → 404).

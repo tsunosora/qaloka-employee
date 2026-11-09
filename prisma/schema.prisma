@@ -72,6 +72,7 @@ model User {
   magangDinilai       MagangTugas[]       @relation("MagangPenilai")
   magangJurnalDicek   MagangJurnal[]      @relation("MagangJurnalCek")
   magangMisiDiputus   MagangMisiKiriman[] @relation("MagangMisiPutus")
+  magangPantauDibuat  MagangPantau[]      @relation("MagangPantauDibuat")
 }
 
 model Department {
@@ -1280,4 +1281,34 @@ model MagangMisiKiriman {
   @@index([status])
   @@index([diputusOlehId])
   @@index([diputusOlehKaryawanId])
+}
+
+// ── Pantauan guru sekolah (11 Nov 2026) ───────────────────────────────────────────────────────────
+// Tautan HANYA-BACA untuk guru pembimbing satu sekolah: /pantau/<token> + PIN (bcrypt). sekolahKunci =
+// kunciSekolah() nama sekolah (lib/services/magang/sekolah.ts) — anak yang ditampilkan dicocokkan dengan
+// sekolahSama(), bukan kesamaan teks mentah. kunciAktif = sekolahKunci selama tautan aktif, NULL sesudah
+// dicabut → indeks unik menjamin satu tautan aktif per sekolah. "Ganti tautan" = cabut yang lama + buat
+// baru (token baru). Sesi guru (cookie) memuat sidik token & sidik pinHash → cabut/ganti/ubah PIN
+// langsung mematikan sesi lama.
+model MagangPantau {
+  id                 Int       @id @default(autoincrement())
+  sekolahKunci       String    @db.VarChar(150)
+  sekolahLabel       String    @db.VarChar(150)
+  kunciAktif         String?   @unique @db.VarChar(150)
+  token              String    @unique @db.VarChar(64)
+  pinHash            String    @db.VarChar(100)
+  aktif              Boolean   @default(true)
+  kedaluwarsa        DateTime?
+  tampilLampiranIzin Boolean   @default(false)
+  terakhirDibukaAt   DateTime?
+  dibukaKali         Int       @default(0)
+  dicabutAt          DateTime?
+  dibuatOlehId       Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  dibuatOleh User? @relation("MagangPantauDibuat", fields: [dibuatOlehId], references: [id], onDelete: SetNull)
+
+  @@index([sekolahKunci])
+  @@index([dibuatOlehId])
 }

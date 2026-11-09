@@ -89,6 +89,7 @@ const NAV: NavGroup[] = [
       { label: "Pos & Soal", href: "/magang/pos" },
       { label: "Side Quest", href: "/magang/misi" },
       { label: "Peserta", href: "/magang/peserta" },
+      { label: "Sekolah", href: "/magang/sekolah" },
     ],
   },
   { label: "Inventaris", href: "/inventaris", icon: IconBox, require: "manager" },

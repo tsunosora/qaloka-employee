@@ -30,6 +30,9 @@ export default auth((req) => {
     pathname.startsWith("/me/") ||
     // Pendaftaran magang mandiri: dibuka anak yang belum punya akun (lewat tautan dari pengawas).
     pathname.startsWith("/daftar-magang/") ||
+    // Pantauan guru sekolah: dibuka guru TANPA akun (tautan + PIN per sekolah, hanya baca).
+    pathname.startsWith("/pantau/") ||
+    pathname.startsWith("/api/public/pantau/") ||
     // Absen lewat HP: dibuka karyawan TANPA akun (masuk dengan PIN), dan layar QR dibuka
     // tablet/TV toko. Dicocokkan per segmen — "/absen" bukan awalan "/absence".
     pathname.startsWith("/absen/") ||
