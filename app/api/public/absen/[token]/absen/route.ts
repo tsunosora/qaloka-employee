@@ -3,7 +3,7 @@ import { json, route } from "@/lib/http";
 import { notifyManagers } from "@/lib/notify";
 import { getSetting } from "@/lib/settings";
 import { requirePortalOwner } from "@/lib/services/portal/auth";
-import { SETELAN_LUAR, luarDiizinkan, putuskanAbsen, putuskanAbsenLuar, KODE_BOLEH_LUAR } from "@/lib/services/absen-hp/aturan";
+import { SETELAN_LUAR, barisLogTolak, luarDiizinkan, putuskanAbsen, putuskanAbsenLuar, KODE_BOLEH_LUAR } from "@/lib/services/absen-hp/aturan";
 import { FOTO_MAKS_BITA, catatAbsenHp, catatPengajuanLuar, lokasiAktif, simpanFoto } from "@/lib/services/absen-hp/simpan";
 import { kontakDari } from "@/lib/services/fingerspot/kontak-mesin";
 
@@ -53,6 +53,14 @@ export const POST = route<Ctx>(async (req, ctx) => {
     nowMs: Date.now(),
   };
 
+  const fotoMasuk = form.get("foto");
+  const tolak = (kode: string, x: { jarakM?: number | null; lokasi?: string | null } = {}) =>
+    console.warn(barisLogTolak({
+      employeeId: employee.id, kode, akurasiM, ...x,
+      fotoBita: fotoMasuk instanceof File ? fotoMasuk.size : null,
+      fotoTipe: fotoMasuk instanceof File ? fotoMasuk.type || "?" : null,
+    }));
+
   const luar = form.get("luar") === "1";
   let keputusanLuar: ReturnType<typeof putuskanAbsenLuar> | null = null;
   let keputusan: ReturnType<typeof putuskanAbsen> | null = null;
@@ -63,20 +71,26 @@ export const POST = route<Ctx>(async (req, ctx) => {
       where: { employeeId: employee.id, alasan: { not: null }, createdAt: { gte: awalHari } },
     });
     keputusanLuar = putuskanAbsenLuar({ ...dasar, izinkan: izinkanLuar, alasan: String(form.get("alasan") ?? ""), pengajuanHariIni });
-    if (!keputusanLuar.ok) return json(keputusanLuar, { status: 422 });
+    if (!keputusanLuar.ok) {
+      tolak(`luar:${keputusanLuar.kode}`);
+      return json(keputusanLuar, { status: 422 });
+    }
   } else {
     keputusan = putuskanAbsen(dasar);
     if (!keputusan.ok) {
+      tolak(keputusan.kode, { jarakM: keputusan.jarakM, lokasi: keputusan.lokasi });
       // HP tahu boleh menawarkan "Ajukan absen di luar lokasi" tanpa harus menebak setelan owner.
       return json({ ...keputusan, bolehLuar: izinkanLuar && KODE_BOLEH_LUAR.includes(keputusan.kode) }, { status: 422 });
     }
   }
 
-  const foto = form.get("foto");
+  const foto = fotoMasuk;
   if (!(foto instanceof File) || foto.size === 0) {
+    tolak("tanpa_foto");
     return json({ ok: false, kode: "tanpa_foto", alasan: "Ambil foto wajah dulu." }, { status: 422 });
   }
   if (foto.size > FOTO_MAKS_BITA) {
+    tolak("foto_besar");
     return json({ ok: false, kode: "foto_besar", alasan: "Foto terlalu besar. Coba ambil ulang." }, { status: 422 });
   }
 
@@ -84,6 +98,7 @@ export const POST = route<Ctx>(async (req, ctx) => {
   try {
     fotoPath = await simpanFoto(new Uint8Array(await foto.arrayBuffer()));
   } catch {
+    tolak("bukan_gambar");
     return json({ ok: false, kode: "bukan_gambar", alasan: "Berkas foto tidak dikenali. Ambil ulang fotonya." }, { status: 422 });
   }
   const ip = kontakDari(req.headers).ip;

@@ -217,3 +217,22 @@ export function bolehDiputus(status: string, attendanceId: number | null): { ok:
   if (attendanceId !== null) return { ok: false, alasan: "Pengajuan ini sudah tercatat di absensi." };
   return { ok: true };
 }
+
+/**
+ * Satu baris log untuk absen HP yang DITOLAK (pm2 out log). Penolakan tidak menyimpan apa pun di basis
+ * data, jadi tanpa ini owner tidak punya bukti apa-apa saat karyawan bilang "absen saya ditolak"
+ * (9 Nov 2026). Sengaja TANPA koordinat, token, atau id perangkat — cukup jarak & akurasi.
+ */
+export function barisLogTolak(a: {
+  employeeId: number; kode: string; jarakM?: number | null; akurasiM?: number; lokasi?: string | null;
+  fotoBita?: number | null; fotoTipe?: string | null; nowMs?: number;
+}): string {
+  const bagian = [`[absen-hp] TOLAK karyawan=${a.employeeId}`, `kode=${a.kode}`];
+  if (a.lokasi) bagian.push(`lokasi="${a.lokasi.replace(/"/g, "'")}"`);
+  if (Number.isFinite(a.jarakM ?? NaN)) bagian.push(`jarak=${Math.round(a.jarakM as number)}m`);
+  if (Number.isFinite(a.akurasiM ?? NaN)) bagian.push(`akurasi=${Math.round(a.akurasiM as number)}m`);
+  if (a.fotoBita != null) bagian.push(`foto=${a.fotoBita}B`);
+  if (a.fotoTipe) bagian.push(`tipe=${a.fotoTipe}`);
+  bagian.push(new Date(a.nowMs ?? Date.now()).toISOString());
+  return bagian.join(" ");
+}
