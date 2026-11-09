@@ -239,4 +239,4 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
   cadangan (`~/alat/pulihkan-deskripsi-orientasi-20261109.sh` + `.log`, hasil identik dengan cadangan). Pelajaran: pakai `mysql -r`
   (raw) bila keluaran dijadikan JSON.
 - Verifikasi API (`~/alat/verifikasi-7anak-20261109.log`, sesi portal 5 menit, GET): 7 anak posIni Orientasi, berikut = jadwal 16 Nov,
-  19 misi tampil (side quest otomatis), /me 200; Bimbingan Faisal 5 pos aktif + Orientasi.
+  19 misi tampil (side quest otomatis), /me 200; Bimbingan Faisal = Orientasi + 4 pos utama.
