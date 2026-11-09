@@ -113,3 +113,6 @@ Simulasi penuh 13 minggu (laporan `D:\FAISAL\laporan-magang\`) menemukan 9 hal; 
   `~/alat/nyalakan-absen-hp-magang-20261109.sh`). Lokasi terdaftar: **Toko Pusat** (radius 100 m, dari 18 Okt).
   Lokasi cabang BELUM: tidak ada koordinat sah di sistem (`company_branches` POS: Imogiri & Sewon tanpa
   lat/lng) → Faisal menambahkannya di Setelan → Absen HP → *Lokasi saya* sambil berdiri di cabang.
+- **Terdeploy ke Voliko 9 Nov 11.01** (`509e919`, skrip `~/alat/deploy-rms-absenportal-20261109.sh`, log `.log` di
+  sebelahnya, cadangan `~/cadangan/deploy-rms-20261109-110118/`). Diperiksa: `/me`, `/absen`, portal API 200;
+  peserta mendapat `absenHp: true`; poller Fingerspot tetap jalan.
