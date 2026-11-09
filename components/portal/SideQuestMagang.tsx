@@ -46,7 +46,7 @@ type Data =
   | { peserta: false }
   | {
       peserta: true;
-      kategori: { key: string; label: string; prioritas: string; ringkas: string }[];
+      kategori: { kunci: string; nama: string; prioritas: string | null; ringkas: string | null }[];
       maksFoto: number;
       minTeks: number;
       progres: { kategori: ProgresKategori[]; selesai: number; total: number; poin: number; poinMaks: number; menunggu: number };
@@ -86,7 +86,7 @@ export function ChipStatus({ status }: { status: StatusMisiTampil }) {
 }
 
 /**
- * Side quest di tab Magang anak: misi wajib di luar rotasi pos (CS, Desain, Marketing). Progres di
+ * Side quest di tab Magang anak: misi wajib di luar rotasi pos (kategorinya diatur admin). Progres di
  * atas, misi dikelompokkan per kategori (tertutup), satu misi terbuka sekaligus berisi formulir bukti.
  * Mode owner (bolehKirim=false) hanya melihat — server juga menolak 403.
  */
@@ -174,8 +174,8 @@ export function SideQuestMagang({ token, q, bolehKirim }: { token: string; q: st
       <ul className="mt-4 space-y-2">
         {pr.kategori.map((k) => {
           const terbuka = kategoriBuka === k.kategori;
-          const info = data.kategori.find((x) => x.key === k.kategori);
-          const misi = data.misi.filter((m) => m.kategori === k.kategori || (k.kategori === "lain" && !data.kategori.some((x) => x.key === m.kategori)));
+          const info = data.kategori.find((x) => x.kunci === k.kategori);
+          const misi = data.misi.filter((m) => m.kategori === k.kategori || (k.kategori === "lain" && !data.kategori.some((x) => x.kunci === m.kategori)));
           const idPanel = `sq-kat-${k.kategori}`;
           return (
             <li key={k.kategori} className="rounded-xl border border-border">
@@ -197,8 +197,7 @@ export function SideQuestMagang({ token, q, bolehKirim }: { token: string; q: st
                     </span>
                   </span>
                   <span className="block text-xs text-muted">
-                    Prioritas {k.prioritas}
-                    {info?.ringkas && <> · {info.ringkas}</>}
+                    {[k.prioritas !== "—" ? `Prioritas ${k.prioritas}` : null, info?.ringkas].filter(Boolean).join(" · ")}
                   </span>
                   <Bar nilai={k.selesai} dari={k.total} label={`${k.label}: misi selesai`} />
                 </span>

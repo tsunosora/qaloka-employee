@@ -6,10 +6,10 @@
  *
  * Privasi: bukti tidak boleh memuat nomor/wajah/data pelanggan → pakai inisial atau minta izin.
  */
-import type { JenisBukti, KategoriMisi, LevelMisi } from "./misi";
+import type { JenisBukti, KunciKategoriAwal, LevelMisi } from "./misi";
 
 export type MisiContoh = {
-  kategori: KategoriMisi;
+  kategori: KunciKategoriAwal;
   level: LevelMisi;
   judul: string;
   deskripsi: string;

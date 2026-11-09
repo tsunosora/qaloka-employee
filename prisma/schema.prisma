@@ -487,10 +487,27 @@ model LeaveRequest {
 
   employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   decidedBy User?    @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  lampiran  LeaveLampiran[]
 
   @@index([employeeId])
   @@index([status])
   @@index([startDate])
+}
+
+// Lampiran pengajuan izin (foto surat dokter / PDF). Berkasnya di storage/izin (DI LUAR public/),
+// nama acak dari server; tersaji hanya lewat rute ber-PIN (pemiliknya) / ber-login (manajemen).
+model LeaveLampiran {
+  id             Int      @id @default(autoincrement())
+  leaveRequestId Int
+  path           String   @db.VarChar(255) // relatif ke folder lampiran, nama acak
+  nama           String   @db.VarChar(150) // nama berkas asli yang sudah dibersihkan — tampilan saja
+  tipe           String   @db.VarChar(50) // image/jpeg | image/png | image/webp | application/pdf
+  ukuran         Int
+  createdAt      DateTime @default(now())
+
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  @@index([leaveRequestId])
 }
 
 // Poin harian karyawan — hasil hitungan dari omzet, pekerjaan, task & kehadiran.
@@ -1193,12 +1210,30 @@ model MagangPendaftar {
 }
 
 // ── Side quest magang (9 Nov 2026) ─────────────────────────────────────────────────────────────
-// Misi WAJIB di luar rotasi pos (Customer Service, Desain Grafis, Digital Marketing) yang dikerjakan
+// Kategori side quest yang dikelola admin (10 Nov 2026). kunci = slug tetap (dibuat dari nama saat
+// tambah, TIDAK berubah saat ganti nama) yang dirujuk MagangMisi.kategori. Kategori yang masih dipakai
+// misi (termasuk misi terhapus) tidak bisa dihapus — nonaktifkan atau pindahkan misinya dulu.
+// Nonaktif = misinya tidak diberikan ke anak dan tidak dihitung di progres.
+model MagangMisiKategori {
+  id        Int      @id @default(autoincrement())
+  kunci     String   @unique @db.VarChar(40)
+  nama      String   @db.VarChar(80)
+  ringkas   String?  @db.VarChar(200)
+  prioritas String?  @db.VarChar(30) // label bebas, mis. "Menengah" / "Rendah"
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  misi MagangMisi[]
+}
+
+// Misi WAJIB di luar rotasi pos (mis. Customer Service, Desain Grafis, Digital Marketing) yang dikerjakan
 // sepanjang magang. Berlaku untuk SEMUA peserta (tanpa baris penugasan): misi aktif = tugas tiap anak.
-// kategori = KATEGORI_MISI di lib/services/magang/misi.ts; bukti = daftar "foto,tautan,teks".
+// kategori = MagangMisiKategori.kunci; bukti = daftar "foto,tautan,teks".
 model MagangMisi {
   id        Int       @id @default(autoincrement())
-  kategori  String    @db.VarChar(20)
+  kategori  String    @db.VarChar(40)
   level     String    @default("dasar") @db.VarChar(20)
   judul     String    @db.VarChar(150)
   deskripsi String?   @db.Text
@@ -1210,7 +1245,8 @@ model MagangMisi {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  kiriman MagangMisiKiriman[]
+  kategoriRef MagangMisiKategori  @relation(fields: [kategori], references: [kunci], onUpdate: Cascade, onDelete: Restrict)
+  kiriman     MagangMisiKiriman[]
 
   @@index([kategori])
 }

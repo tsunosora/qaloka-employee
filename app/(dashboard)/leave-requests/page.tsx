@@ -5,6 +5,10 @@ import { api } from "@/lib/fetcher";
 import { IconAlert, IconCheck, IconX, IconTrash } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/Modal";
 import { LeaveStatusBadge, longDate, soft } from "@/components/portal/ui";
+import { DaftarLampiran } from "@/components/portal/LampiranIzin";
+import type { LampiranMeta } from "@/components/portal/types";
+
+const urlLampiran = (leaveId: number) => (id: number) => `/api/leave-requests/${leaveId}/lampiran/${id}`;
 
 type Row = {
   id: number;
@@ -23,6 +27,7 @@ type Row = {
   decidedAt: string | null;
   decidedBy: string | null;
   createdAt: string;
+  lampiran: LampiranMeta[];
 };
 
 type Payload = { items: Row[]; total: number; page: number; perPage: number; pending: number };
@@ -48,19 +53,35 @@ export default function LeaveRequestsPage() {
   const [decide, setDecide] = useState<{ row: Row; action: "approve" | "reject" | "cancel" } | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lihat, setLihat] = useState<{ row: Row; lampiran: LampiranMeta } | null>(null);
 
+  const ambil = useCallback(
+    () => api<Payload>(`/api/leave-requests${filter ? `?status=${filter}` : ""}`),
+    [filter]
+  );
   const load = useCallback(async () => {
     setError("");
     try {
-      setData(await api<Payload>(`/api/leave-requests${filter ? `?status=${filter}` : ""}`));
+      setData(await ambil());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memuat data.");
     }
-  }, [filter]);
+  }, [ambil]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let hidup = true;
+    ambil().then(
+      (d) => {
+        if (!hidup) return;
+        setError("");
+        setData(d);
+      },
+      (e) => hidup && setError(e instanceof Error ? e.message : "Gagal memuat data.")
+    );
+    return () => {
+      hidup = false;
+    };
+  }, [ambil]);
 
   async function submitDecision() {
     if (!decide) return;
@@ -161,12 +182,25 @@ export default function LeaveRequestsPage() {
                     {r.department && ` · ${r.department}`}
                   </p>
                 </div>
-                <LeaveStatusBadge status={r.status} />
+                <div className="flex items-center gap-2">
+                  {r.lampiran.length > 0 && (
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
+                      {r.lampiran.length} lampiran
+                    </span>
+                  )}
+                  <LeaveStatusBadge status={r.status} />
+                </div>
               </div>
 
               <p className="mt-2 rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted">
                 {r.reason}
               </p>
+
+              <DaftarLampiran
+                lampiran={r.lampiran}
+                urlDari={urlLampiran(r.id)}
+                onBuka={(l) => setLihat({ row: r, lampiran: l })}
+              />
 
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
                 <span>Diajukan {new Date(r.createdAt).toLocaleString("id-ID")}</span>
@@ -209,6 +243,28 @@ export default function LeaveRequestsPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {lihat && (
+        <Modal title={`Lampiran — ${lihat.row.employeeName}`} size="xl" onClose={() => setLihat(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- lampiran pribadi lewat rute ber-login */}
+          <img
+            src={urlLampiran(lihat.row.id)(lihat.lampiran.id)}
+            alt={`Lampiran: ${lihat.lampiran.nama}`}
+            className="mx-auto max-h-[65vh] w-auto rounded-xl border border-border object-contain"
+          />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-subtle">
+            <span className="min-w-0 truncate">{lihat.lampiran.nama}</span>
+            <a
+              href={urlLampiran(lihat.row.id)(lihat.lampiran.id)}
+              target="_blank"
+              rel="noopener"
+              className="btn-ghost h-9 text-xs"
+            >
+              Buka di tab baru
+            </a>
+          </div>
+        </Modal>
       )}
 
       {decide && (

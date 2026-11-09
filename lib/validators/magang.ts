@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { MAKS_INGATAN, MIN_INGATAN } from "@/lib/services/magang/nilai";
 import { MIN_KEGIATAN, MAKS_KEGIATAN } from "@/lib/services/magang/jurnal";
-import { KUNCI_BUKTI, KUNCI_KATEGORI, KUNCI_LEVEL, MAKS_TEKS_MISI } from "@/lib/services/magang/misi";
+import {
+  KUNCI_BUKTI,
+  KUNCI_LEVEL,
+  MAKS_KUNCI_KATEGORI,
+  MAKS_NAMA_KATEGORI,
+  MAKS_TEKS_MISI,
+  POLA_KUNCI_KATEGORI,
+} from "@/lib/services/magang/misi";
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD");
 const teksOpsional = (maks: number) =>
@@ -169,8 +176,16 @@ export const pesertaBaruSchema = z
 
 // ── Side quest (9 Nov 2026) ───────────────────────────────────────────────────────────────────
 
+/** Kunci kategori (slug). Keberadaan & status aktifnya diperiksa di route terhadap DB. */
+const kunciKategori = z
+  .string({ error: "Pilih kategori" })
+  .trim()
+  .min(1, "Pilih kategori")
+  .max(MAKS_KUNCI_KATEGORI)
+  .regex(POLA_KUNCI_KATEGORI, "Kategori tidak dikenal");
+
 export const misiSchema = z.object({
-  kategori: z.enum(KUNCI_KATEGORI),
+  kategori: kunciKategori,
   level: z.enum(KUNCI_LEVEL).default("dasar"),
   judul: z.string().trim().min(3, "Judul minimal 3 huruf").max(150),
   deskripsi: teksOpsional(4000),
@@ -179,6 +194,41 @@ export const misiSchema = z.object({
   urutan: z.number().int().min(0).max(999).default(0),
   aktif: z.boolean().default(true),
 });
+
+// ── Kategori side quest dikelola admin (10 Nov 2026) ───────────────────────────────────────────
+
+const namaKategori = z.string().trim().min(2, "Nama kategori minimal 2 huruf").max(MAKS_NAMA_KATEGORI, "Nama kategori terlalu panjang");
+/** Untuk PATCH: tidak dikirim = tidak diubah; "" / null = dikosongkan. */
+const teksUbah = (maks: number) =>
+  z
+    .string()
+    .max(maks)
+    .nullable()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v && v.trim() ? v.trim() : null));
+
+export const kategoriMisiSchema = z.object({
+  nama: namaKategori,
+  ringkas: teksOpsional(200),
+  prioritas: teksOpsional(30),
+});
+
+export const ubahKategoriMisiSchema = z
+  .object({
+    nama: namaKategori.optional(),
+    ringkas: teksUbah(200),
+    prioritas: teksUbah(30),
+    aktif: z.boolean().optional(),
+    urutan: z.number().int().min(0).max(9999).optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), { message: "Tidak ada yang diubah" });
+
+/** Urutan baru: semua id kategori dari atas ke bawah. */
+export const urutanKategoriMisiSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(200),
+});
+
+export const pindahKategoriMisiSchema = z.object({ ke: kunciKategori });
 
 /** Bukti misi dari portal (multipart → objek). hapusFoto = indeks foto lama yang dibuang, mis. "0,2". */
 export const kirimMisiSchema = z.object({

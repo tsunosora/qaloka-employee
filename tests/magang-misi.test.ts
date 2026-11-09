@@ -6,10 +6,13 @@ import {
   gabungBukti,
   tautanSah,
   bolehKirimMisi,
-  KUNCI_KATEGORI,
+  KATEGORI_AWAL,
 } from "@/lib/services/magang/misi";
 import { CONTOH_MISI } from "@/lib/services/magang/contoh-misi";
 import { misiSchema, kirimMisiSchema, putusMisiSchema } from "@/lib/validators/magang";
+
+// Kategori dari DB (di sini: isi awal yang sama dengan migrasi).
+const KAT = KATEGORI_AWAL.map((k) => ({ ...k, aktif: true }));
 
 describe("side quest — progres per kategori", () => {
   const misi = [
@@ -20,11 +23,15 @@ describe("side quest — progres per kategori", () => {
   ];
 
   it("menghitung x/y dan poin hanya dari yang disetujui", () => {
-    const p = progresMisi(misi, [
-      { misiId: 1, status: "disetujui" },
-      { misiId: 2, status: "menunggu" },
-      { misiId: 3, status: "ditolak" },
-    ]);
+    const p = progresMisi(
+      misi,
+      [
+        { misiId: 1, status: "disetujui" },
+        { misiId: 2, status: "menunggu" },
+        { misiId: 3, status: "ditolak" },
+      ],
+      KAT
+    );
     const cs = p.kategori.find((k) => k.kategori === "cs")!;
     expect(cs).toMatchObject({ selesai: 1, menunggu: 1, total: 2, poin: 10, poinMaks: 25 });
     expect(p.kategori.find((k) => k.kategori === "desain")).toMatchObject({ selesai: 0, ditolak: 1, total: 1 });
@@ -32,21 +39,25 @@ describe("side quest — progres per kategori", () => {
   });
 
   it("peserta baru (tanpa kiriman) otomatis mendapat semua misi aktif", () => {
-    const p = progresMisi(misi, []);
+    const p = progresMisi(misi, [], KAT);
     expect(p.total).toBe(4);
     expect(p.selesai).toBe(0);
   });
 
   it("kiriman untuk misi yang sudah dinonaktifkan tidak ikut dihitung", () => {
-    const p = progresMisi(misi.slice(0, 1), [
-      { misiId: 1, status: "disetujui" },
-      { misiId: 99, status: "disetujui" },
-    ]);
+    const p = progresMisi(
+      misi.slice(0, 1),
+      [
+        { misiId: 1, status: "disetujui" },
+        { misiId: 99, status: "disetujui" },
+      ],
+      KAT
+    );
     expect(p).toMatchObject({ selesai: 1, total: 1 });
   });
 
   it("kategori tanpa misi tidak ditampilkan", () => {
-    expect(progresMisi([{ id: 1, kategori: "cs", poin: 5 }], []).kategori.map((k) => k.kategori)).toEqual(["cs"]);
+    expect(progresMisi([{ id: 1, kategori: "cs", poin: 5 }], [], KAT).kategori.map((k) => k.kategori)).toEqual(["cs"]);
   });
 });
 
@@ -81,9 +92,12 @@ describe("side quest — bukti", () => {
 });
 
 describe("side quest — validator", () => {
-  it("misi: kategori harus dikenal, bukti minimal satu", () => {
+  it("misi: kategori berbentuk kunci (slug), bukti minimal satu", () => {
     expect(misiSchema.safeParse({ kategori: "cs", judul: "Balas chat", bukti: ["teks"] }).success).toBe(true);
-    expect(misiSchema.safeParse({ kategori: "konten", judul: "Balas chat", bukti: ["teks"] }).success).toBe(false);
+    // Kategori baru buatan admin sah di validator; keberadaannya diperiksa route terhadap DB.
+    expect(misiSchema.safeParse({ kategori: "fotografi-produk", judul: "Foto katalog", bukti: ["foto"] }).success).toBe(true);
+    expect(misiSchema.safeParse({ kategori: "Bukan Slug!", judul: "Balas chat", bukti: ["teks"] }).success).toBe(false);
+    expect(misiSchema.safeParse({ kategori: "", judul: "Balas chat", bukti: ["teks"] }).success).toBe(false);
     expect(misiSchema.safeParse({ kategori: "cs", judul: "Balas chat", bukti: [] }).success).toBe(false);
   });
 
@@ -101,7 +115,7 @@ describe("side quest — validator", () => {
 
 describe("bank misi awal (dari dokumen Materi Internship)", () => {
   it("ketiga kategori terisi, semuanya sah menurut validator", () => {
-    for (const k of KUNCI_KATEGORI) expect(CONTOH_MISI.filter((m) => m.kategori === k).length).toBeGreaterThanOrEqual(5);
+    for (const { kunci: k } of KATEGORI_AWAL) expect(CONTOH_MISI.filter((m) => m.kategori === k).length).toBeGreaterThanOrEqual(5);
     for (const m of CONTOH_MISI) expect(misiSchema.safeParse(m).success, m.judul).toBe(true);
   });
 

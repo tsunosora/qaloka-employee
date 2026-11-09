@@ -192,4 +192,8 @@ export type LeaveRequestItem = {
   decisionNote: string | null;
   decidedAt: string | null;
   createdAt: string;
+  /** Foto surat dokter / PDF (metadata saja; berkasnya lewat rute ber-PIN). */
+  lampiran: LampiranMeta[];
 };
+
+export type LampiranMeta = { id: number; nama: string; tipe: string; ukuran: number };
