@@ -184,6 +184,11 @@ export default function AbsenPage({ params }: { params: Promise<{ token: string 
         <div className="flex items-center gap-2.5">
           <UbinLogo />
           <NamaMerek className="text-lg" />
+          {keadaan.portal && (
+            <a href={`/me/${token}`} className="btn-ghost ml-auto h-11 px-3 text-xs">
+              Halaman pribadi
+            </a>
+          )}
         </div>
 
         <section className="glass-2 rounded-3xl p-5 text-center shadow-xl">

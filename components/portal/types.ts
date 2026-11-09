@@ -23,6 +23,10 @@ export type PortalState = {
   magang?: boolean;
   /** Pembimbing pos magang aktif → tab Bimbingan tampil. */
   pembimbing?: boolean;
+  /** Absen lewat HP menyala untuk karyawan ini (+ add-on termasuk lisensi) → tombol "Absen sekarang". */
+  absenHp?: boolean;
+  /** Portal /me termasuk lisensi → halaman absen menautkan balik ke /me. */
+  portal?: boolean;
 };
 
 export type AttendanceRow = {

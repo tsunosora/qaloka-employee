@@ -4,6 +4,8 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/fetcher";
 import {
   IconAlert,
+  IconArrowRight,
+  IconAttendance,
   IconChevronLeft,
   IconChevronRight,
   IconLogout,
@@ -192,6 +194,24 @@ export default function EmployeePortalPage({ params }: { params: Promise<{ token
         )}
 
         {showPinForm && <ChangePinForm token={token} onDone={() => setShowPinForm(false)} />}
+
+        {/* Absen lewat HP (add-on): halaman absennya terpisah (/absen/<token>) tapi memakai sesi PIN
+            yang sama, jadi tidak perlu PIN ulang. Mode owner tidak bisa mengabsenkan → tidak tampil. */}
+        {state.absenHp && !state.asManager && (
+          <a
+            href={`/absen/${token}`}
+            className="glass flex min-h-[64px] items-center gap-3 rounded-2xl p-3 pr-4 transition hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-primary-2 text-on-primary shadow-lg shadow-primary/25">
+              <IconAttendance className="text-[20px]" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold text-fg">Absen masuk / pulang</span>
+              <span className="block text-xs text-muted">Foto wajah + lokasi HP, di tempat kerja yang terdaftar</span>
+            </span>
+            <IconArrowRight className="shrink-0 text-[18px] text-muted" aria-hidden />
+          </a>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Tab di barisnya sendiri: kalau berbagi baris dengan pemilih bulan, di HP cuma satu tab yang terlihat. */}

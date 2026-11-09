@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { awalHitung, potongSebelum } from "./awal-hitung";
 import { aggregateAttendance } from "@/lib/services/attendance/aggregate";
 import { buildEmployeeReceipt } from "@/lib/services/attendance/receipt-source";
 import type { ReceiptData } from "@/lib/services/attendance/receipt";
@@ -144,7 +145,7 @@ export async function buildPortalOverview(
   posproUserId: number | null = null
 ): Promise<PortalOverview> {
   const prev = previousRange(period.startStr, period.endStr);
-  const [attendance, receipt, assessments, publicAgg, publicItems, pospro, daily, prevAttendance] =
+  const [attendance, receipt, assessments, publicAgg, publicItems, pospro, daily, prevAttendance, orang, magang] =
     await Promise.all([
     aggregateAttendance(prisma, {
       startStr: period.startStr,
@@ -180,10 +181,14 @@ export async function buildPortalOverview(
       endStr: prev.endStr,
       employeeId: String(employeeId),
     }),
+    prisma.employee.findUnique({ where: { id: employeeId }, select: { joinDate: true } }),
+    prisma.magangPeserta.findMany({ where: { employeeId }, select: { mulai: true } }),
   ]);
+  // Hari sebelum bergabung / sebelum masa magang tidak dihitung (lib/services/portal/awal-hitung.ts).
+  const awal = awalHitung({ joinDate: orang?.joinDate ?? null, magangMulai: magang.map((m) => m.mulai) });
 
   const outputByDate = new Map((daily?.days ?? []).map((d) => [d.date, d]));
-  const rows: PortalAttendanceRow[] = attendance.rows.map((r) => ({
+  const rows: PortalAttendanceRow[] = potongSebelum(attendance.rows, awal).map((r) => ({
     date: r.date,
     clockIn: r.clockIn,
     clockOut: r.clockOut,
@@ -200,7 +205,7 @@ export async function buildPortalOverview(
   const discipline = compareDiscipline(
     summarizeDiscipline(rows),
     summarizeDiscipline(
-      prevAttendance.rows.map((r) => ({
+      potongSebelum(prevAttendance.rows, awal).map((r) => ({
         clockIn: r.clockIn,
         lateMinutes: r.lateMinutes,
         workedMinutes: workedMinutesOf(r.clockIn, r.clockOut),
