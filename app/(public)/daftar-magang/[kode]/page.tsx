@@ -139,7 +139,7 @@ export default function DaftarMagangPage({ params }: { params: Promise<{ kode: s
             </Medan>
             {info.sekolah ? (
               <Medan label="Sekolah / kampus" bantu="Sudah diisi dari tautan ini — tidak perlu diubah.">
-                <input className="input cursor-not-allowed opacity-80" value={info.sekolah} readOnly aria-readonly />
+                <input className="input cursor-not-allowed border-dashed bg-surface-2 font-semibold" value={info.sekolah} readOnly aria-readonly />
               </Medan>
             ) : (
               <Medan label="Sekolah / kampus" wajib>

@@ -257,7 +257,7 @@ export default function MagangPage() {
                       </div>
                     )}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs">
-                      <span className="text-muted">{p.posBerikut ? `Berikutnya: ${p.posBerikut.nama} (${tglPendek(p.posBerikut.mulai)})` : "Pos terakhir"}</span>
+                      <span className="text-muted">{p.posBerikut ? `Berikutnya: ${p.posBerikut.nama} (${tglPendek(p.posBerikut.mulai)})` : p.adaRotasi ? "Pos terakhir" : "Belum punya jadwal rotasi"}</span>
                       <Link href={`/magang/rapor/${p.id}`} className="font-semibold text-primary hover:underline">
                         Rapor
                       </Link>

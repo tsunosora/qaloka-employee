@@ -148,7 +148,7 @@ export default function RotasiMagangPage() {
           <section className="glass space-y-4 rounded-2xl p-4">
             <div className="flex flex-wrap items-end gap-3">
               <label className="block">
-                <span className="text-sm font-semibold text-fg">Mulai minggu</span>
+                <span className="block text-sm font-semibold text-fg">Mulai minggu</span>
                 <input type="date" className="input mt-1.5 h-11 w-auto" value={dari} onChange={(e) => setDari(e.target.value ? seninDari(e.target.value) : "")} />
               </label>
               {posAktif.length === 0 && <p className="pb-3 text-sm text-warning">Belum ada pos aktif. Tambahkan pos dulu.</p>}

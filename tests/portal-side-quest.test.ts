@@ -17,8 +17,8 @@ describe("side quest di halaman pribadi — status tampil", () => {
   });
 
   it("ringkasan bukti yang diminta", () => {
-    expect(ringkasBukti(["foto", "teks"])).toBe("Kirim foto + tulisan");
-    expect(ringkasBukti(["tautan"])).toBe("Kirim tautan");
+    expect(ringkasBukti(["foto", "teks"])).toBe("Bukti: foto + tulisan");
+    expect(ringkasBukti(["tautan"])).toBe("Bukti: tautan");
   });
 });
 

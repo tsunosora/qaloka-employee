@@ -37,9 +37,9 @@ export function persen(x: number, dari: number): number {
 
 const LABEL_BUKTI: Record<JenisBukti, string> = { foto: "foto", tautan: "tautan", teks: "tulisan" };
 
-/** ["foto","teks"] → "Kirim foto + tulisan". */
+/** ["foto","teks"] → "Bukti: foto + tulisan" (dibaca anak & pembimbing — bukan tombol aksi). */
 export function ringkasBukti(bukti: readonly JenisBukti[]): string {
-  return `Kirim ${bukti.map((b) => LABEL_BUKTI[b]).join(" + ")}`;
+  return `Bukti: ${bukti.map((b) => LABEL_BUKTI[b]).join(" + ")}`;
 }
 
 export type GalatBukti = Partial<Record<JenisBukti, string>>;

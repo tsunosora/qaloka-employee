@@ -122,3 +122,42 @@ Simulasi penuh 13 minggu (laporan `D:\FAISAL\laporan-magang\`) menemukan 9 hal; 
   foto besar & sesi PIN habis punya pesan sendiri. **Penolakan tercatat** di `~/.pm2/logs/ratemystaff-error-12.log`
   (`grep "absen-hp] TOLAK"`: karyawan, kode, jarak, akurasi, ukuran/jenis foto — tanpa koordinat/token). Diuji di
   produksi dengan kiriman id-perangkat tak sah (tercatat, tidak ada yang ditulis). Lokasi aktif: Voliko Pusat & Voliko Cabang.
+
+## Side quest, sekolah & rombongan baru (9 Nov 2026, `feat/magang-sidequest` — BELUM dideploy)
+
+Dasar: dokumen *Materi Internship* Faisal (9 Nov). Tugas UTAMA (rotasi, waktu terbanyak) = **Konten** & **Produksi**;
+**Customer Service** & **Desain Grafis** (prioritas menengah) dan **Digital Marketing** (rendah) = SIDE QUEST wajib
+yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap berlaku (baris di tiap pos).
+
+- **Side quest** (`lib/services/magang/misi.ts`, `misi-db.ts`, tabel `MagangMisi` + `MagangMisiKiriman`): menu
+  **Magang → Side Quest** — bank misi (judul, deskripsi, kategori `cs|desain|marketing`, level dasar/menengah/lanjut,
+  bukti foto/tautan/tulisan, poin, aktif) + antrean *Perlu diperiksa* (saring sekolah). Kosong → *Pakai bank misi awal*
+  (`contoh-misi.ts`: CS 7, Desain 7 termasuk tugas akhir **jersey fantasy**, Marketing 5 = 19 misi, tanpa harga/kebijakan).
+  Misi aktif berlaku untuk SEMUA peserta tanpa baris penugasan → peserta baru otomatis mendapatnya. Anak mengirim bukti
+  dari `/me/<token>` tab Magang (kartu Side Quest, foto diperkecil di HP, maks 3); satu baris per anak per misi:
+  menunggu → disetujui (terkunci) / ditolak + catatan (anak memperbaiki, `kirimKe` naik). Diputus dari dasbor ATAU tab
+  **Bimbingan** (semua pembimbing pos aktif boleh — side quest bukan pos; mode owner baca saja). Progres x/y per kategori
+  + poin di Minggu Ini & rapor. Side quest TIDAK mengubah nilai akhir (rapor menyebutnya). Tautan hanya http(s).
+- **Sekolah**: `MagangPeserta`/`MagangPendaftar` + `guruPembimbing`, `kontakGuru`; `MagangDaftar.sekolah` = tautan
+  pendaftaran khusus satu sekolah/rombongan (formulir terkunci; server memakai sekolah tautan). Nama sekolah dikelompokkan
+  tanpa peduli huruf besar/spasi (`sekolah.ts` — data Voliko memuat 3 tulisan untuk satu sekolah). Saringan sekolah di
+  Minggu Ini, Peserta, Rotasi, antrean Side Quest; **Cetak rapor per sekolah** (`/magang/rapor/sekolah`, satu anak per
+  halaman, isi rapor = komponen `RaporIsi` yang sama dengan rapor per anak).
+- **Rotasi rombongan baru**: `POST /api/magang/rotasi {dari, mode:"baru", pesertaIds?}` → HANYA anak tanpa jadwal sejak
+  `dari` (atau yang dicentang) yang disusun; jadwal anak lain tidak berubah & ikut dihitung sebagai isi pos (kapasitas
+  dihormati). UI Rotasi Pos: *Tambah peserta baru saja* vs *Susun ulang semua…* (konfirmasi). Aturan "semua pos sebelum
+  mengulang" tetap; bila semua pos yang belum dipegang penuh → tetap `berbagi` (banner peringatan). Simulasi: 5 pos ×
+  2 mgg × kap 3 menampung 12 anak dari 3 rombongan (mulai 16 Nov, 7 Des, 4 Jan) tanpa berbagi; kap 2 → 17 blok berbagi.
+- **Lokasi pos**: `MagangPos.lokasi` (label, mis. "Voliko Sport"). Lokasi tim Pusat/Cabang tetap di catatan peserta.
+- **Pos prioritas** (`lib/services/magang/pos-prioritas.ts`, semua 2 minggu, kap 3, 8–9 soal): Konten: Shooting &
+  Talent · Konten: Editing, Copywriting & Posting · Produksi: Voliko Print · Produksi: Voliko Sport (lokasi Voliko Sport)
+  · Runner & Stok.
+- **Skrip data Voliko** `tools/magang/voliko-pos-prioritas.ts` (`npx tsx …` di folder app; DRY-RUN bawaan, `--jalankan`
+  untuk menulis; perlu migrasi sudah terpasang; cadangan JSON dulu; satu transaksi tanpa DDL): buat 5 pos + soal (bila
+  belum ada), NONAKTIFKAN (tidak hapus) Customer Service/Desainer/Operator Outdoor/Operator A3+, susun ulang penugasan
+  4 anak mulai Senin 16 Nov (minggu Orientasi 9–14 Nov tidak disentuh; batal bila ada tugas/jurnal ≥ 16 Nov). Orientasi
+  dibiarkan aktif → nonaktifkan sebelum *Susun ulang semua*, atau pakai *Tambah peserta baru*.
+- **Deploy** `tools/magang/deploy-sidequest-voliko.sh <SHA>` (cadangan DB+.env+storage, ff-only dari f77dedb, migrasi,
+  build, restart `ratemystaff` saja). Migrasi `20261109000000_magang_sidequest_sekolah` hanya MENAMBAH (2 tabel, 6 kolom nullable + 1 indeks).
+- Tes: `magang-misi`, `magang-rotasi-rombongan`, `magang-sekolah`, `magang-pendaftaran-sekolah`, `magang-pos-prioritas`,
+  `magang-sidequest-ui`, `portal-side-quest`.
