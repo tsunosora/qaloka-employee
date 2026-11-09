@@ -219,7 +219,7 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
   identik. Unggah lampiran SAH sengaja tidak diuji di produksi (akan membuat pengajuan sungguhan + notifikasi manajer; tidak ada rute
   hapus pengajuan) — diuji di DB uji lokal.
 
-## Pantauan guru sekolah (feat/magang-pantau-guru — BELUM dideploy)
+## Pantauan guru sekolah (feat/magang-pantau-guru — terdeploy ke Voliko 10 Nov 00.46)
 
 Guru pembimbing dari sekolah memantau anak sekolahnya sendiri lewat tautan + PIN, **hanya melihat**.
 
@@ -265,3 +265,14 @@ Guru pembimbing dari sekolah memantau anak sekolahnya sendiri lewat tautan + PIN
   `tests/magang-pantau-serial.test.ts` (tidak ada kunci terlarang di JSON guru).
 - **Deploy**: `tools/magang/deploy-pantau-guru-voliko.sh <SHA>` (ff-only dari `abc2ee0`, cadangan DB+.env+storage, migrasi, build,
   restart `ratemystaff` saja; hitungan data magang sebelum = sesudah; MagangPantau = 0; curl `/api/public/pantau/tidak-ada` → 404).
+
+### Deploy Voliko 10 Nov 2026 00.45–00.46 (izin Faisal)
+
+- `~/web/rate-my-staff` `abc2ee0` → **`da81381`** (ff-only, `setsid nohup` `~/alat/deploy-rms-pantau-guru-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-004531` 55 tabel 5,6 MB + .env + storage). Lockfile sama; migrasi `20261111000000_magang_pantau_guru`;
+  build OK (20 peringatan Turbopack); restart `ratemystaff` saja (restart 8; poller tak berubah, tak di-restart). `6dc0d91` TIDAK ikut.
+- Diperiksa: log galat kosong; /login, /me, /absen 200; `/pantau/<palsu>` 200 tanpa nama anak/sekolah, `X-Robots-Tag: noindex`,
+  `Cache-Control: no-store`; API `/api/public/pantau/<palsu>` (status, masuk PIN, anak, anak/1) → 404 "Tautan tidak berlaku…" sama semua;
+  halaman Magang → Sekolah ada di build (`/magang/sekolah` → login); hitungan magang/izin sebelum = sesudah; rotasi 7 anak (80 blok),
+  jurnal, absensi 9 Nov (Fingerspot 22, HP 8) identik; MagangPantau = 0 (tautan guru dibuat Faisal sendiri). Webhook Fingerspot hidup
+  (GET 405); deploy tengah malam → scan baru belum ada, cek pagi.
