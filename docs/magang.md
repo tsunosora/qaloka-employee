@@ -527,7 +527,7 @@ Sengaja SEDERHANA: anak cukup tahu "hari ini KONTEN / PRODUKSI bersama siapa"; d
 - Catatan: Wafiq belum punya absensi sama sekali (9 & 10 Nov) → hari itu terhitung tidak hadir; koreksi lewat dasbor **Absensi → input
   manual** (`/api/attendance/manual`) atau pengajuan izin — tidak dibuat otomatis.
 
-## Jam kerja khusus magang (feat/magang-jam-kerja — BELUM dideploy)
+## Jam kerja khusus magang (feat/magang-jam-kerja — KODE terdeploy ke Voliko 10 Nov 22.10; data jam BELUM)
 
 Anak dari sekolah berbeda punya jam berbeda (mis. SMK N 4 09.00–17.00, SMK Negeri 2 Sewon 08.00–16.00). Fitur **Jadwal Kerja**
 (WorkSchedule/roster) tidak cukup: di mode shift otomatis — yang selalu dipakai laporan, simpan status, input manual & impor —
@@ -589,3 +589,15 @@ dibuat terpisah dan hanya berlaku untuk anak magang.
   dengan `computeShift`; jadwal per-karyawan & flexible tetap), urutan anak → sekolah → umum per kolom, toleransi, nonaktif/di luar masa,
   kunci sekolah tanpa peduli huruf besar, batas 62 hari, PATCH sebagian, hitung ulang hanya baris anak, impor, rencana skrip idempoten,
   nama asli hanya di berkas data, bentuk migrasi. Tangkapan (data fiktif): `.tangkapan/jam-*.png`.
+
+### Deploy Voliko 10 Nov 2026 22.09–22.10 (izin Faisal) — data jam DITAHAN
+
+- `~/web/rate-my-staff` `527372b` → **`d47000c`** (ff-only, `setsid nohup` `~/alat/deploy-rms-jam-kerja-20261111.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-220906` 64 tabel + .env + storage). Lockfile sama; migrasi `20261115000000_magang_jam_kerja`; restart
+  `ratemystaff` saja; galat baru 0. Absensi karyawan biasa sebelum = sesudah (3625 baris, checksum sama); konten/jadwal harian/rotasi/jurnal utuh.
+- `tools/magang/voliko-jam-kerja.ts` **dry-run saja** (`~/alat/voliko-jam-kerja-dryrun-20261111.log`): SMK N 4 09:00–17:00 → Aqila/Cerry/Putra
+  terlambat 1 → 0 hari; SMK Negeri 2 Sewon 08:00–16:00 → Rizki/Yufita/Alif/Marisa 0 → 1 hari. Sebab: Senin 9 Nov absen HP baru menyala ±11.00,
+  mereka masuk 11.10–11.20; aturan lama membaca absen siang sebagai shift siang (tidak terlambat), aturan magang selalu shift pagi → terlambat
+  ±3 jam di hari pertama. **`--jalankan` ditahan menunggu keputusan Faisal.** Selama jam kosong, hitungan sama persis dengan sebelumnya.
+- Tempat mengubah jam: Magang → **Sekolah** (kartu sekolah → "Jam kerja anak magang", tombol "Cek dampak dulu") dan Magang → **Peserta** (ubah →
+  "Jam khusus anak ini").
