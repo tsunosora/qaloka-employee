@@ -165,10 +165,10 @@ describe("jadwal konten — tautan", () => {
   });
 
   it("validator menolak tautan bukan http(s) di baris & brief", () => {
-    expect(kontenBaruSchema.safeParse({ tanggal: "2026-11-02", konsepId: 1, linkFootage: "javascript:alert(1)" }).success).toBe(false);
-    expect(kontenBaruSchema.safeParse({ tanggal: "2026-11-02", konsepId: 1, linkFootage: "  " }).data?.linkFootage).toBeNull();
-    expect(kontenBaruSchema.safeParse({ tanggal: "2026-11-02", konsepId: 1, pesertaId: 1, grupId: 2 }).success).toBe(false);
-    expect(kontenBaruSchema.safeParse({ tanggal: "2026-02-30", konsepId: 1 }).success).toBe(false);
+    expect(kontenBaruSchema.safeParse({ platformId: 1, tanggal: "2026-11-02", konsepId: 1, linkFootage: "javascript:alert(1)" }).success).toBe(false);
+    expect(kontenBaruSchema.safeParse({ platformId: 1, tanggal: "2026-11-02", konsepId: 1, linkFootage: "  " }).data?.linkFootage).toBeNull();
+    expect(kontenBaruSchema.safeParse({ platformId: 1, tanggal: "2026-11-02", konsepId: 1, pesertaId: 1, grupId: 2 }).success).toBe(false);
+    expect(kontenBaruSchema.safeParse({ platformId: 1, tanggal: "2026-02-30", konsepId: 1 }).success).toBe(false);
     expect(briefSchema.safeParse({ drive: [{ label: "x", url: "javascript:1" }] }).success).toBe(false);
   });
 });
@@ -177,8 +177,9 @@ describe("jadwal konten — brief & pola", () => {
   it("brief: drive boleh tanpa URL (belum diketahui), isi rusak → brief kosong", () => {
     const r = briefSchema.parse({ drive: [{ label: "1. DRIVE", url: "" }], catatan: "Catatan", font: "Rubik", preset: "Outline", caption: "Teks", hashtag: "#a #b" });
     expect(r.drive[0]).toEqual({ label: "1. DRIVE", url: "" });
-    expect(uraiBrief(JSON.stringify(r))).toEqual(r);
-    expect(uraiBrief("{bukan json")).toEqual({ drive: [], catatan: "", font: "", preset: "", caption: "", hashtag: "" });
+    // Brief lama (tanpa referensi) tetap terbaca; sejak multi-platform ada referensi khusus platform (bawaan {}).
+    expect(uraiBrief(JSON.stringify(r))).toEqual({ ...r, referensi: {} });
+    expect(uraiBrief("{bukan json")).toEqual({ drive: [], catatan: "", font: "", preset: "", caption: "", hashtag: "", referensi: {} });
     expect(uraiBrief(null).drive).toEqual([]);
   });
 
@@ -248,7 +249,7 @@ describe("jadwal konten — anak (HP)", () => {
   });
 
   it("rute pembina memakai requireManager", () => {
-    for (const f of ["route.ts", "[id]/route.ts", "buat/route.ts", "konsep/route.ts", "status/route.ts", "grup/route.ts", "kode/route.ts", "brief/route.ts", "pola/route.ts"]) {
+    for (const f of ["route.ts", "[id]/route.ts", "buat/route.ts", "konsep/route.ts", "status/route.ts", "grup/route.ts", "kode/route.ts", "pola/route.ts", "platform/route.ts", "platform/[id]/route.ts", "platform/[id]/brief/route.ts", "platform/[id]/arsip/route.ts", "platform/[id]/buka-arsip/route.ts", "platform/urutan/route.ts", "setujui/route.ts"]) {
       expect(readFileSync(`app/api/magang/konten/${f}`, "utf8"), f).toMatch(/requireManager\(\)/);
     }
   });

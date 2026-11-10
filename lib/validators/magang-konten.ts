@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAKS_TAUTAN, bulanSah, tanggalSah, tautanSah, warnaSah } from "@/lib/services/magang/konten";
+import { KUNCI_IKON, MAKS_TAUTAN, bulanSah, tanggalSah, tautanSah, warnaSah, type KunciIkon } from "@/lib/services/magang/konten";
 
 const ymd = z.string().refine(tanggalSah, "Format tanggal harus YYYY-MM-DD");
 export const bulanSchema = z.string().refine(bulanSah, "Format bulan harus YYYY-MM");
@@ -77,6 +77,7 @@ const isiBarisUbah = {
 /** Pembina menambah baris. pesertaId & grupId: paling banyak satu. */
 export const kontenBaruSchema = z
   .object({
+    platformId: id,
     tanggal: ymd,
     konsepId: id,
     pesertaId: id.nullable().optional(),
@@ -90,6 +91,7 @@ export const kontenBaruSchema = z
 /** Pembina mengubah sebagian kolom (sunting sel). Kolom yang tidak dikirim = tidak diubah. */
 export const ubahKontenSchema = z
   .object({
+    platformId: id.optional(),
     tanggal: ymd.optional(),
     konsepId: id.optional(),
     pesertaId: id.nullable().optional(),
@@ -111,7 +113,9 @@ export const ubahKontenAnakSchema = z
   })
   .strict();
 
+/** "Buat jadwal bulan berikut" selalu untuk SATU platform (giliran kode & grup per platform). */
 export const buatBulanSchema = z.object({
+  platformId: id,
   bulan: bulanSchema,
   ganti: z.boolean().default(false),
   simpan: z.boolean().default(false),
@@ -179,7 +183,30 @@ export const kodeAnakSchema = z
     return new Set(k).size === k.length;
   }, "Satu kode hanya untuk satu anak");
 
-// ── Catatan & brief (Setting magang_konten_brief) + pola hari ─────────────────────────────────
+// ── Platform (13 Nov 2026) ────────────────────────────────────────────────────────────────────
+
+const namaPlatform = z.string().trim().min(2, "Nama platform minimal 2 huruf").max(80, "Nama platform maksimal 80 huruf");
+const ikonPlatform = z.enum(KUNCI_IKON as [KunciIkon, ...KunciIkon[]], { message: "Ikon tidak dikenal" });
+
+export const platformSchema = z.object({
+  nama: namaPlatform,
+  warna: warna.default("putih"),
+  ikon: ikonPlatform.nullable().optional(),
+  urutan: z.number().int().min(0).max(999).optional(),
+});
+/** PATCH platform: tanpa .default() (zod 4 tetap mengisi bawaan di .partial()); tidak dikirim = tidak diubah, ikon null = dihapus. */
+export const ubahPlatformSchema = z
+  .object({
+    nama: namaPlatform.optional(),
+    warna: warna.optional(),
+    ikon: ikonPlatform.nullable().optional(),
+    urutan: z.number().int().min(0).max(999).optional(),
+  })
+  .strict();
+/** Susun ulang: id SEMUA platform dalam urutan baru. */
+export const urutanPlatformSchema = z.object({ urutan: z.array(id).min(1).max(100) });
+
+// ── Catatan & brief (per platform: MagangKontenPlatform.brief) + pola hari ────────────────────────
 
 export const briefSchema = z.object({
   drive: z.array(tautanBerlabel).max(10).default([]),
@@ -189,17 +216,24 @@ export const briefSchema = z.object({
   caption: z.string().trim().max(5000).default(""),
   hashtag: z.string().trim().max(2000).default(""),
 });
-export type BriefKonten = z.infer<typeof briefSchema>;
-export const BRIEF_KOSONG: BriefKonten = { drive: [], catatan: "", font: "", preset: "", caption: "", hashtag: "" };
+/**
+ * Brief satu platform = bentuk brief lama (Setting magang_konten_brief, disalin migrasi 20261113) + referensi
+ * khusus platform per konsep: {"<konsepId>": [{label,url}]}. Daftar kosong / tidak ada → referensi bawaan konsep.
+ */
+export const briefPlatformSchema = briefSchema.extend({
+  referensi: z.record(z.string().regex(/^\d{1,9}$/, "Kunci referensi harus id konsep"), z.array(tautanBerlabel).max(10)).default({}),
+});
+export type BriefKonten = z.infer<typeof briefPlatformSchema>;
+export const BRIEF_KOSONG: BriefKonten = { drive: [], catatan: "", font: "", preset: "", caption: "", hashtag: "", referensi: {} };
 
-/** Isi Setting yang rusak/kosong → brief kosong (tidak melempar). */
-export function uraiBrief(nilai: string | null | undefined): BriefKonten {
-  if (!nilai) return { ...BRIEF_KOSONG };
+/** Isi brief (kolom Json, atau teks JSON Setting lama) yang rusak/kosong → brief kosong (tidak melempar). */
+export function uraiBrief(nilai: unknown): BriefKonten {
+  if (nilai == null || nilai === "") return { ...BRIEF_KOSONG, referensi: {} };
   try {
-    const r = briefSchema.safeParse(JSON.parse(nilai));
-    return r.success ? r.data : { ...BRIEF_KOSONG };
+    const r = briefPlatformSchema.safeParse(typeof nilai === "string" ? JSON.parse(nilai) : nilai);
+    return r.success ? r.data : { ...BRIEF_KOSONG, referensi: {} };
   } catch {
-    return { ...BRIEF_KOSONG };
+    return { ...BRIEF_KOSONG, referensi: {} };
   }
 }
 

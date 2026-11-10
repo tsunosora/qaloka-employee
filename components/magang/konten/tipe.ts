@@ -1,22 +1,27 @@
 import type { CSSProperties } from "react";
 import { hexWarna } from "@/lib/services/magang/konten";
-import type { AnakJson, BarisJson, GrupJson, KonsepJson, Rencana, StatusJson } from "@/lib/services/magang/konten-db";
+import type { AnakJson, BarisJson, GrupJson, KonsepJson, PlatformJson, Rencana, StatusJson } from "@/lib/services/magang/konten-db";
 import type { BriefKonten } from "@/lib/validators/magang-konten";
 import type { PolaKonten } from "@/lib/services/magang/konten";
 
 /** Bentuk JSON GET /api/magang/konten?bulan=… (lihat dataBulan di konten-db.ts). */
 export type DataKonten = {
   bulan: string;
+  /** Platform yang ditampilkan; null = "Semua platform". */
+  platformId: number | null;
   baris: BarisJson[];
   konsep: KonsepJson[];
   status: StatusJson[];
   grup: GrupJson[];
   anak: AnakJson[];
-  brief: BriefKonten;
+  /** Semua platform (termasuk arsip), urut tampil. */
+  platform: PlatformJson[];
+  /** Brief platform terpilih; null saat "Semua platform". */
+  brief: BriefKonten | null;
   pola: PolaKonten;
   libur: { tanggal: string; nama: string }[];
 };
-export type { AnakJson, BarisJson, GrupJson, KonsepJson, Rencana, StatusJson, BriefKonten, PolaKonten };
+export type { AnakJson, BarisJson, GrupJson, KonsepJson, PlatformJson, Rencana, StatusJson, BriefKonten, PolaKonten };
 
 /**
  * Latar sel dari warna palet: dicampur transparan supaya teks var(--fg) tetap terbaca di tema terang

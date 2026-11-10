@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ComponentType, type SVGProps } from "react";
+import { useEffect, useRef, useState, type ComponentType, type SVGProps } from "react";
 import { bolehHalaman, useLisensi, type LisensiTampil } from "@/components/lisensi/Lisensi";
 import { NamaMerek, UbinLogo } from "@/components/QendaliMark";
 import {
@@ -147,7 +147,9 @@ function navForRole(role: string | null | undefined, lisensi: LisensiTampil): Na
 
 export function Sidebar({ role }: { role?: string | null }) {
   return (
-    <aside className="glass sticky top-0 z-20 hidden h-screen w-64 shrink-0 flex-col gap-1 rounded-none border-y-0 border-l-0 p-4 lg:flex">
+    // h-dvh + overflow-hidden: tinggi aside dikunci ke layar; yang bergulir hanya daftar menu
+    // (di SidebarNav), jadi logo tetap di atas dan kartu bawah tetap di bawah tanpa menutupi menu.
+    <aside className="glass sticky top-0 z-20 hidden h-dvh w-64 shrink-0 flex-col gap-1 overflow-hidden rounded-none border-y-0 border-l-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:flex">
       <SidebarNav role={role} />
     </aside>
   );
@@ -166,14 +168,30 @@ export function SidebarNav({ role }: { role?: string | null }) {
   const terbaik = semuaHref.filter(cocok).sort((a, b) => b.length - a.length)[0];
   const isActive = (href: string) => href === terbaik;
 
+  // Menu aktif digulir ke dalam pandangan saat dimuat (mis. Pengaturan di bawah daftar panjang).
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current
+      ?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [pathname]);
+
   return (
     <>
-      <Link href="/dashboard" className="mb-6 flex items-center gap-2.5 px-2">
+      <Link href="/dashboard" className="mb-6 flex shrink-0 items-center gap-2.5 px-2">
         <UbinLogo />
         <NamaMerek className="text-lg" />
       </Link>
 
-      <nav className="flex flex-1 flex-col gap-1 text-sm">
+      {/* Satu-satunya bagian yang bergulir. min-h-0 supaya boleh menyusut di kolom flex.
+          -mx-1/px-1 & -my-1/py-1: ruang untuk cincin fokus agar tak terpotong tepi gulir.
+          Di desktop, alur scrollbar dicadangkan tetap (tanpa geser tata letak saat menu
+          memanjang) dan dikompensasi dengan margin kanan supaya lebar menu sama seperti dulu. */}
+      <nav
+        ref={navRef}
+        aria-label="Navigasi utama"
+        className="-mx-1 -my-1 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-1 py-1 text-sm lg:-mr-3.5 lg:[scrollbar-gutter:stable]"
+      >
         {nav.map((group) =>
           group.children ? (
             <NavGroupItem key={group.label} group={group} isActive={isActive} />
@@ -181,6 +199,7 @@ export function SidebarNav({ role }: { role?: string | null }) {
             <Link
               key={group.label}
               href={group.href!}
+              aria-current={isActive(group.href!) ? "page" : undefined}
               className={linkClass(isActive(group.href!))}
             >
               <group.icon className="text-[18px] shrink-0" />
@@ -190,7 +209,7 @@ export function SidebarNav({ role }: { role?: string | null }) {
         )}
       </nav>
 
-      <div className="mt-auto rounded-xl border border-border bg-surface-2 p-3 text-xs text-muted">
+      <div className="mt-2 shrink-0 rounded-xl border border-border bg-surface-2 p-3 text-xs text-muted">
         <p className="font-semibold text-fg">Team Management</p>
         <p className="mt-0.5 leading-relaxed">
           Absensi, proyek, briefing &amp; penilaian dalam satu tempat.
@@ -213,8 +232,10 @@ function NavGroupItem({
   return (
     <div>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition ${
+        aria-expanded={open}
+        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition max-lg:min-h-11 ${
           anyActive && !open
             ? "text-fg"
             : "text-muted hover:bg-surface-2 hover:text-fg"
@@ -239,6 +260,8 @@ function NavGroupItem({
               <Link
                 key={c.href}
                 href={c.href}
+                aria-current={isActive(c.href) ? "page" : undefined}
+                tabIndex={open ? undefined : -1}
                 className={subLinkClass(isActive(c.href))}
               >
                 {c.label}
@@ -253,7 +276,8 @@ function NavGroupItem({
 
 function linkClass(active: boolean) {
   return [
-    "flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition",
+    // max-lg:min-h-11 — target sentuh ≥44px di laci HP; desktop tetap seperti semula.
+    "flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium transition max-lg:min-h-11",
     active
       ? "bg-gradient-to-r from-primary to-primary-2 text-on-primary shadow-lg shadow-primary/25"
       : "text-muted hover:bg-surface-2 hover:text-fg",
@@ -262,7 +286,7 @@ function linkClass(active: boolean) {
 
 function subLinkClass(active: boolean) {
   return [
-    "rounded-lg px-3 py-2 transition",
+    "flex items-center rounded-lg px-3 py-2 transition max-lg:min-h-11",
     active
       ? "bg-surface-2 font-medium text-primary"
       : "text-muted hover:bg-surface-2 hover:text-fg",

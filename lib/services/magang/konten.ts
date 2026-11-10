@@ -370,6 +370,7 @@ export function tanpaUndefined<T extends Record<string, unknown>>(o: T): Partial
 }
 
 export type UbahKontenMasuk = {
+  platformId?: number;
   konsepId?: number;
   pesertaId?: number | null;
   grupId?: number | null;
@@ -400,4 +401,215 @@ export function dataUbahKonten(
   if (d.grupId) data.pesertaId = null;
   if (status) data.selesaiAt = selesaiAtBaru(status.final, selesaiAtLama, sekarang);
   return data;
+}
+
+// ── Platform (13 Nov 2026) ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Ikon platform (kunci disimpan di DB, SVG-nya di components/magang/konten/IkonPlatform.tsx). Ikon hanya hiasan —
+ * nama platform selalu tertulis di sebelahnya.
+ */
+export const IKON_PLATFORM = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  facebook: "Facebook",
+  toko: "Toko / etalase",
+  web: "Situs web",
+  kamera: "Kamera / foto",
+} as const;
+export type KunciIkon = keyof typeof IKON_PLATFORM;
+export const KUNCI_IKON = Object.keys(IKON_PLATFORM) as KunciIkon[];
+
+/** Kunci (slug tetap) platform baru dari namanya, mis. "Epic Jogja" → "epic-jogja". */
+export function kunciPlatformUnik(nama: string, terpakai: Iterable<string>): string {
+  return kunciKategoriUnik(nama, terpakai);
+}
+
+const rapiNama = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+/** Nama platform bentrok dengan platform lain (tanpa peduli huruf besar & spasi ganda)? */
+export function namaPlatformBentrok(nama: string, daftar: readonly { id: number; nama: string }[], kecualiId?: number): boolean {
+  const n = rapiNama(nama);
+  return daftar.some((p) => p.id !== kecualiId && rapiNama(p.nama) === n);
+}
+
+/** Data Prisma untuk mengarsipkan (aktif=false + diarsipkanAt) atau membuka arsip (aktif=true, diarsipkanAt=null). */
+export function dataArsipPlatform(arsip: boolean, sekarang: Date = new Date()): { aktif: boolean; diarsipkanAt: Date | null } {
+  return arsip ? { aktif: false, diarsipkanAt: sekarang } : { aktif: true, diarsipkanAt: null };
+}
+
+/** Hapus platform hanya bila belum punya baris jadwal. Dipakai → 409 + jumlahnya; UI lalu menawarkan "Arsipkan". */
+export function putusanHapusPlatform(dipakai: number): { boleh: true } | { boleh: false; status: 409; body: { message: string; dipakai: number } } {
+  if (dipakai <= 0) return { boleh: true };
+  return { boleh: false, status: 409, body: { message: `Platform ini dipakai ${dipakai} baris jadwal, jadi tidak bisa dihapus. Arsipkan saja.`, dipakai } };
+}
+
+/** Urutan baru dari daftar id (urutan tampil). Harus berisi SEMUA platform tepat sekali; selain itu null. */
+export function urutanPlatformBaru(idUrut: readonly number[], semuaId: readonly number[]): { id: number; urutan: number }[] | null {
+  if (idUrut.length !== semuaId.length || new Set(idUrut).size !== idUrut.length) return null;
+  const ada = new Set(semuaId);
+  if (!idUrut.every((id) => ada.has(id))) return null;
+  return idUrut.map((id, i) => ({ id, urutan: i + 1 }));
+}
+
+/** Tukar posisi satu platform dengan tetangganya (naik = -1, turun = +1); di ujung daftar tidak berubah. */
+export function geserUrutan(idUrut: readonly number[], id: number, arah: -1 | 1): number[] {
+  const i = idUrut.indexOf(id);
+  const j = i + arah;
+  if (i < 0 || j < 0 || j >= idUrut.length) return [...idUrut];
+  const baru = [...idUrut];
+  [baru[i], baru[j]] = [baru[j], baru[i]];
+  return baru;
+}
+
+export type TautanBerlabel = { label: string; url: string };
+/**
+ * Referensi konsep untuk satu platform: daftar khusus platform (brief.referensi[konsepId]) bila TIDAK kosong,
+ * selain itu bawaan semua platform (MagangKontenKonsep.referensi).
+ */
+export function referensiEfektif(
+  bawaan: readonly TautanBerlabel[],
+  khusus: Readonly<Record<string, readonly TautanBerlabel[]>> | null | undefined,
+  konsepId: number
+): { referensi: TautanBerlabel[]; sumber: "platform" | "bawaan" } {
+  const k = khusus?.[String(konsepId)];
+  return k && k.length > 0 ? { referensi: [...k], sumber: "platform" } : { referensi: [...bawaan], sumber: "bawaan" };
+}
+
+// ── Rencana generator per platform (murni; konten-db.ts memuat datanya) ───────────────────────────
+
+/** Baris jadwal secukupnya untuk generator (tanggal YYYY-MM-DD). */
+export type BarisGenerator = IsiBaris & {
+  id: number;
+  platformId: number;
+  tanggal: string;
+  konsepId: number;
+  pesertaId: number | null;
+  grupId: number | null;
+  urutan?: number;
+};
+
+export type MasukanRencana = {
+  bulan: string;
+  ganti: boolean;
+  platformId: number;
+  konsep: readonly { id: number; kunci: string; aktif: boolean }[];
+  status: readonly { id: number; kunci: string; aktif: boolean; final: boolean }[];
+  grup: readonly { id: number; aktif: boolean }[];
+  anak: readonly { pesertaId: number; kode: number | null; aktif: boolean }[];
+  pola: PolaKonten;
+  libur: readonly string[];
+  /**
+   * Baris bulan itu + riwayat sebelum bulan itu (boleh berisi platform lain — DISARING di sini): giliran kode anak
+   * dan giliran grup EMPATHY berjalan PER PLATFORM, jadi hanya baris platformId ini yang dihitung.
+   */
+  baris: readonly BarisGenerator[];
+};
+
+export type RencanaMurni = {
+  bulan: string;
+  platformId: number;
+  baris: { tanggal: string; konsepId: number; pesertaId: number | null; grupId: number | null; kode: number | null }[];
+  hapus: number[];
+  dipertahankan: number;
+  dilewati: { tanggal: string; alasan: string }[];
+  masalah: string[];
+  statusAwalId: number | null;
+};
+
+/** Status awal baris baru: "belum-take" bila aktif, selain itu status aktif bukan-final pertama. */
+export function pilihStatusAwal<T extends { kunci: string; aktif: boolean; final: boolean }>(status: readonly T[]): T | null {
+  return status.find((s) => s.kunci === "belum-take" && s.aktif) ?? status.find((s) => s.aktif && !s.final) ?? null;
+}
+
+/**
+ * Susun rencana satu bulan untuk SATU platform. ganti=false → hanya tanggal yang belum punya baris DI PLATFORM INI;
+ * ganti=true → baris platform ini yang BELUM dikerjakan (bolehDiganti) dihapus lalu disusun ulang.
+ * Kode anak melanjutkan kode terakhir platform ini sebelum bulan itu; grup EMPATHY melanjutkan EMPATHY terakhir
+ * platform ini — baris platform lain tidak memengaruhi giliran.
+ */
+export function susunRencana(m: MasukanRencana): RencanaMurni {
+  const masalah: string[] = [];
+  const awal = pilihStatusAwal(m.status);
+  if (!awal) masalah.push('Belum ada status aktif yang bukan final (mis. "Belum take") — tambahkan di Setelan → Status.');
+
+  const konsepAktif = new Map(m.konsep.filter((k) => k.aktif).map((k) => [k.kunci, k]));
+  const polaHari: PolaHari = {};
+  for (const h of [1, 2, 3, 4, 5, 6] as const) {
+    const kunci = m.pola.hari[h];
+    if (!kunci) continue;
+    if (konsepAktif.has(kunci)) polaHari[h] = kunci;
+    else masalah.push(`Pola hari ke-${h} memakai konsep "${kunci}" yang tidak ada / nonaktif — hari itu dilewati.`);
+  }
+  const empathy = m.pola.empathy && konsepAktif.has(m.pola.empathy) ? konsepAktif.get(m.pola.empathy)! : null;
+  if (m.pola.empathy && !empathy) masalah.push(`Konsep grup "${m.pola.empathy}" tidak ada / nonaktif — tidak ada hari grup.`);
+
+  const anakAktif = m.anak.filter((a) => a.aktif && a.kode != null);
+  const pesertaDariKode = new Map(anakAktif.map((a) => [a.kode!, a.pesertaId]));
+  const kodePeserta = new Map(m.anak.map((a) => [a.pesertaId, a.kode]));
+  if (anakAktif.length === 0) masalah.push("Belum ada anak aktif yang punya kode — baris dibuat tanpa anak. Atur di Setelan → Kode anak.");
+
+  const urut = (a: BarisGenerator, b: BarisGenerator) => (a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : (a.urutan ?? 0) - (b.urutan ?? 0) || a.id - b.id);
+  const milik = m.baris.filter((b) => b.platformId === m.platformId);
+  const mulai = `${m.bulan}-01`;
+  const akhir = `${geserBulan(m.bulan, 1)}-01`;
+  const ada = milik.filter((b) => b.tanggal >= mulai && b.tanggal < akhir).sort(urut);
+  const sebelum = milik.filter((b) => b.tanggal < mulai).sort(urut).reverse();
+
+  const hapus = m.ganti && awal ? ada.filter((b) => bolehDiganti(b, awal.id)).map((b) => b.id) : [];
+  const tetap = ada.filter((b) => !hapus.includes(b.id));
+  const kodeLalu = sebelum.filter((b) => b.pesertaId != null).map((b) => kodePeserta.get(b.pesertaId!)).find((k) => k != null) ?? null;
+  const empathyLalu = empathy ? sebelum.find((b) => b.konsepId === empathy.id && b.grupId != null) : undefined;
+
+  const petaAda = new Map<string, BarisAda[]>();
+  for (const b of tetap) {
+    const l = petaAda.get(b.tanggal) ?? [];
+    l.push({ kode: b.pesertaId != null ? (kodePeserta.get(b.pesertaId) ?? null) : null, grupId: b.grupId, empathy: !!empathy && b.konsepId === empathy.id });
+    petaAda.set(b.tanggal, l);
+  }
+
+  const hasil = susunBulan({
+    bulan: m.bulan,
+    kode: [...pesertaDariKode.keys()],
+    grupUrut: m.grup.filter((g) => g.aktif).map((g) => g.id),
+    polaHari,
+    empathyKonsep: empathy?.kunci ?? null,
+    selangEmpathy: m.pola.selangHari,
+    mulaiKodeSetelah: kodeLalu,
+    empathyTerakhir: empathyLalu ? { tanggal: empathyLalu.tanggal, grupId: empathyLalu.grupId } : null,
+    libur: new Set(m.libur),
+    ada: petaAda,
+  });
+
+  return {
+    bulan: m.bulan,
+    platformId: m.platformId,
+    baris: hasil.baris.map((b) => ({
+      tanggal: b.tanggal,
+      konsepId: konsepAktif.get(b.konsep)!.id,
+      pesertaId: b.kode != null ? (pesertaDariKode.get(b.kode) ?? null) : null,
+      grupId: b.grupId,
+      kode: b.kode,
+    })),
+    hapus,
+    dipertahankan: tetap.length,
+    dilewati: hasil.dilewati,
+    masalah,
+    statusAwalId: awal?.id ?? null,
+  };
+}
+
+/**
+ * Ringkasan konten untuk pantauan guru: total & per platform (hanya nama platform + hitungan — tanpa judul/tautan).
+ */
+export function ringkasKontenPlatform(baris: readonly { platform: string; urutanPlatform?: number; final: boolean }[]) {
+  const per = new Map<string, { platform: string; urutan: number; terjadwal: number; selesai: number }>();
+  for (const b of baris) {
+    const x = per.get(b.platform) ?? { platform: b.platform, urutan: b.urutanPlatform ?? 0, terjadwal: 0, selesai: 0 };
+    x.terjadwal++;
+    if (b.final) x.selesai++;
+    per.set(b.platform, x);
+  }
+  const perPlatform = [...per.values()].sort((a, b) => a.urutan - b.urutan || a.platform.localeCompare(b.platform)).map(({ platform, terjadwal, selesai }) => ({ platform, terjadwal, selesai }));
+  return { terjadwal: baris.length, selesai: baris.filter((b) => b.final).length, perPlatform };
 }

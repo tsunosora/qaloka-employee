@@ -126,6 +126,18 @@ export function BagianAnak({ d }: { d: DetailAnak }) {
               <dd className="text-xs text-muted">
                 Konten: {d.konten.selesai} selesai dari {d.konten.terjadwal} terjadwal
               </dd>
+              {(d.konten.perPlatform?.length ?? 0) > 1 && (
+                <dd>
+                  <ul className="mt-1 space-y-0.5 text-xs text-fg">
+                    {d.konten.perPlatform!.map((x) => (
+                      <li key={x.platform}>
+                        <span className="font-semibold">{x.platform}</span>: {x.selesai}/{x.terjadwal}
+                      </li>
+                    ))}
+                  </ul>
+                </dd>
+              )}
+              {d.konten.perPlatform?.length === 1 && <dd className="text-xs text-muted">Platform: {d.konten.perPlatform[0].platform}</dd>}
             </div>
           )}
         </dl>

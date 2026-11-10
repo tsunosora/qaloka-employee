@@ -215,7 +215,7 @@ function InputUrutan({ nilai, onUbah }: { nilai: number; onUbah: (n: number) => 
 }
 
 /** Pilihan warna palet: tombol bulat ala radio (panah kiri/kanan untuk berpindah), nama warna tertulis. */
-function PilihWarna({ nilai, onPilih, label = "Warna" }: { nilai: string; onPilih: (w: KunciWarna) => void; label?: string }) {
+export function PilihWarna({ nilai, onPilih, label = "Warna" }: { nilai: string; onPilih: (w: KunciWarna) => void; label?: string }) {
   const id = useId();
   const idx = KUNCI_WARNA.indexOf(nilai as KunciWarna);
   function tombol(e: KeyboardEvent<HTMLButtonElement>, i: number) {

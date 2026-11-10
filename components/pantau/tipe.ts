@@ -46,7 +46,7 @@ export type DetailAnak = {
   }[];
   jadwal: { mulai: string; sampai: string; minggu: number; pos: string; lokasi: string | null; sekarang: boolean }[];
   tugas: { senin: string; pos: string | null; dikirim: string; terlambat: boolean; dinilai: boolean; nilai: number | null; predikat: string; catatanPembimbing: string | null }[];
-  konten?: { selesai: number; terjadwal: number };
+  konten?: { selesai: number; terjadwal: number; perPlatform?: { platform: string; selesai: number; terjadwal: number }[] };
   sideQuest: {
     selesai: number;
     total: number;

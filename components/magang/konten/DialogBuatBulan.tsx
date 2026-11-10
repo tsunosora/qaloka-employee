@@ -5,7 +5,8 @@ import { api } from "@/lib/fetcher";
 import { Modal } from "@/components/ui/Modal";
 import { IconAlert } from "@/components/ui/icons";
 import { bulanSah, namaBulan, namaTanggal, warnaSelKode } from "@/lib/services/magang/konten";
-import { FOKUS, latarWarna, type DataKonten, type Rencana } from "@/components/magang/konten/tipe";
+import { ChipPlatform } from "@/components/magang/konten/IkonPlatform";
+import { FOKUS, latarWarna, type DataKonten, type PlatformJson, type Rencana } from "@/components/magang/konten/tipe";
 
 const ALASAN: Record<string, string> = { libur: "libur", "sudah-ada": "sudah ada baris", "tanpa-pola": "tidak ada pola untuk hari itu" };
 
@@ -13,7 +14,20 @@ const ALASAN: Record<string, string> = { libur: "libur", "sudah-ada": "sudah ada
  * "Buat jadwal bulan berikut": pilih bulan → pratinjau (tidak menulis apa pun) → simpan. Baris baru berstatus
  * awal & berlencana Usulan. Bawaan hanya mengisi tanggal kosong; "ganti" menghapus baris yang belum dikerjakan.
  */
-export function DialogBuatBulan({ data, bulanAwal, onClose, onTersimpan }: { data: DataKonten; bulanAwal: string; onClose: () => void; onTersimpan: (bulan: string, dibuat: number) => void }) {
+export function DialogBuatBulan({
+  data,
+  platform,
+  bulanAwal,
+  onClose,
+  onTersimpan,
+}: {
+  data: DataKonten;
+  /** Jadwal selalu dibuat untuk SATU platform; giliran kode & grup dihitung dari baris platform ini saja. */
+  platform: PlatformJson;
+  bulanAwal: string;
+  onClose: () => void;
+  onTersimpan: (bulan: string, dibuat: number) => void;
+}) {
   const id = useId();
   const [bulan, setBulan] = useState(bulanAwal);
   const [ganti, setGanti] = useState(false);
@@ -29,9 +43,9 @@ export function DialogBuatBulan({ data, bulanAwal, onClose, onTersimpan }: { dat
     setBusy(true);
     setGalat("");
     try {
-      if (!simpan) setRencana(await api<Rencana>("/api/magang/konten/buat", { method: "POST", body: JSON.stringify({ bulan, ganti, simpan: false }) }));
+      if (!simpan) setRencana(await api<Rencana>("/api/magang/konten/buat", { method: "POST", body: JSON.stringify({ platformId: platform.id, bulan, ganti, simpan: false }) }));
       else {
-        const r = await api<{ dibuat: number }>("/api/magang/konten/buat", { method: "POST", body: JSON.stringify({ bulan, ganti, simpan: true }) });
+        const r = await api<{ dibuat: number }>("/api/magang/konten/buat", { method: "POST", body: JSON.stringify({ platformId: platform.id, bulan, ganti, simpan: true }) });
         onTersimpan(bulan, r.dibuat);
       }
     } catch (e) {
@@ -44,9 +58,13 @@ export function DialogBuatBulan({ data, bulanAwal, onClose, onTersimpan }: { dat
   return (
     <Modal title="Buat jadwal bulan berikut" size="xl" onClose={onClose}>
       <div className="space-y-4 text-sm">
+        <p className="flex flex-wrap items-center gap-2 text-fg">
+          Untuk platform <ChipPlatform p={platform} />
+        </p>
         <p className="text-muted">
-          Jadwal disusun dari pola hari (Setelan → Pola hari). Kode anak melanjutkan giliran bulan sebelumnya; hari grup tiap {data.pola.selangHari} hari di hari Sabtu,
-          bergiliran sesuai urutan grup. Minggu & hari libur dilewati. Baris baru bertanda <b className="text-warning">Usulan</b> sampai Anda setujui.
+          Jadwal disusun dari pola hari (Setelan → Pola hari). Kode anak melanjutkan giliran bulan sebelumnya <b className="text-fg">di platform ini</b>; hari grup tiap{" "}
+          {data.pola.selangHari} hari di hari Sabtu, bergiliran sesuai urutan grup (juga per platform). Minggu & hari libur dilewati. Baris baru bertanda{" "}
+          <b className="text-warning">Usulan</b> sampai Anda setujui.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div>

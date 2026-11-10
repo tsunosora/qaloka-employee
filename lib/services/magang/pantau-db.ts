@@ -32,6 +32,7 @@ import {
   serialHariAbsen,
   serialIzinGuru,
   serialJurnalGuru,
+  serialKontenGuru,
   serialRaporRingkas,
   serialScan,
   serialSideQuest,
@@ -363,7 +364,7 @@ export async function detailAnakGuru(t: TautanDb, p: PesertaSekolah, r: { dari: 
       .filter((x) => x.senin >= seninAwal && x.senin <= r.sampai)
       .map((x) => serialTugasGuru({ ...x, predikat: predikat(x.nilai) }))
       .reverse(),
-    // Jadwal konten (12 Nov 2026): hanya hitungan, tanpa tautan/judul.
+    // Jadwal konten (12 Nov 2026; per platform 13 Nov): hanya hitungan, tanpa tautan/judul.
     konten: await hitungKontenGuru(p.id, r),
     sideQuest: serialSideQuest(
       progres.get(p.id) ?? null,
@@ -373,15 +374,14 @@ export async function detailAnakGuru(t: TautanDb, p: PesertaSekolah, r: { dari: 
   };
 }
 
-/** Konten terjadwal (kode anak sendiri + grupnya) dalam rentang, dan yang berstatus final. */
+/** Konten terjadwal (kode anak sendiri + grupnya) dalam rentang, dan yang berstatus final — total & per platform. */
 async function hitungKontenGuru(pesertaId: number, r: { dari: string; sampai: string }) {
   const grupIds = await grupAnak(prisma, pesertaId);
-  const where = { AND: [whereMilikAnak(pesertaId, grupIds), { tanggal: { gte: atMidnight(r.dari), lte: atMidnight(r.sampai) } }] };
-  const [terjadwal, selesai] = await Promise.all([
-    prisma.magangKonten.count({ where }),
-    prisma.magangKonten.count({ where: { AND: [where, { status: { final: true } }] } }),
-  ]);
-  return { selesai, terjadwal };
+  const baris = await prisma.magangKonten.findMany({
+    where: { AND: [whereMilikAnak(pesertaId, grupIds), { tanggal: { gte: atMidnight(r.dari), lte: atMidnight(r.sampai) } }] },
+    select: { platform: { select: { nama: true, urutan: true } }, status: { select: { final: true } } },
+  });
+  return serialKontenGuru(baris);
 }
 
 // ── Admin (dasbor, requireManager di rute) ─────────────────────────────────────────────────────────

@@ -5,14 +5,19 @@ import { api, errorMessageFrom } from "@/lib/fetcher";
 import { IconAlert, IconCheck, IconChevronDown, IconClock, IconCopy, IconLink } from "@/components/ui/icons";
 import { Card, soft } from "@/components/portal/ui";
 import { FOKUS, latarWarna, titikWarna } from "@/components/magang/konten/tipe";
+import { ChipPlatform } from "@/components/magang/konten/IkonPlatform";
 import { namaTanggal, tautanPendek, tautanSah } from "@/lib/services/magang/konten";
 import type { BarisAnakJson } from "@/lib/services/magang/konten-db";
 import type { BriefKonten } from "@/lib/validators/magang-konten";
 
 type Pilihan = { id: number; nama: string; warna: string };
+/** Brief satu platform di HP (referensi khusus platform sudah dilebur ke baris.konsep.referensi oleh server). */
+type BriefAnak = Omit<BriefKonten, "referensi">;
 type Data =
   | { peserta: false }
-  | { peserta: true; hariIni: string; kode: number | null; grup: string[]; brief: BriefKonten; pilihanStatus: Pilihan[]; baris: BarisAnakJson[] };
+  | { peserta: true; hariIni: string; kode: number | null; grup: string[]; brief: Record<string, BriefAnak>; pilihanStatus: Pilihan[]; baris: BarisAnakJson[] };
+
+const BRIEF_KOSONG: BriefAnak = { drive: [], catatan: "", font: "", preset: "", caption: "", hashtag: "" };
 
 const MAKS_DAFTAR = 6;
 
@@ -63,10 +68,11 @@ export function KontenMagang({ token, q, bolehKirim }: { token: string; q: strin
     setData((d) => (d && d.peserta ? { ...d, baris: d.baris.map((b) => (b.id === baru.id ? baru : b)) } : d));
     setTersimpan(baru.id);
   };
+  const briefDari = (b: BarisAnakJson) => data.brief[String(b.platform.id)] ?? BRIEF_KOSONG;
   const detail = (b: BarisAnakJson) => (
     <Detail
       baris={b}
-      brief={data.brief}
+      brief={briefDari(b)}
       pilihan={data.pilihanStatus}
       bolehKirim={bolehKirim}
       url={url}
@@ -113,7 +119,10 @@ export function KontenMagang({ token, q, bolehKirim }: { token: string; q: strin
               </h3>
               <p className="mt-1 flex items-start gap-2 text-sm text-fg">
                 <IconClock className="mt-0.5 shrink-0 text-primary" aria-hidden="true" />
-                <span>Hari ini jadwal kontenmu — {akhiriTitik(data.brief.catatan || "absen di Xposer untuk brief konten")}</span>
+                <span>
+                  Hari ini jadwal kontenmu untuk {[...new Set(hariIni.map((b) => b.platform.nama))].join(" & ")} —{" "}
+                  {akhiriTitik(briefDari(hariIni[0]).catatan || "absen di Xposer untuk brief konten")}
+                </span>
               </p>
               <div className="mt-3 space-y-4 divide-y divide-border">
                 {hariIni.map((b) => (
@@ -128,7 +137,7 @@ export function KontenMagang({ token, q, bolehKirim }: { token: string; q: strin
               <p>Hari ini tidak ada jadwal konten untukmu.</p>
               {semuaBerikut[0] && (
                 <p className="mt-1">
-                  Jadwal berikutnya: <b className="text-fg">{namaTanggal(semuaBerikut[0].tanggal)}</b> — {semuaBerikut[0].konsep.label}
+                  Jadwal berikutnya: <b className="text-fg">{namaTanggal(semuaBerikut[0].tanggal)}</b> — {semuaBerikut[0].konsep.label} ({semuaBerikut[0].platform.nama})
                 </p>
               )}
             </div>
@@ -205,6 +214,7 @@ function ItemBaris({ baris, terbuka, onToggle, children }: { baris: BarisAnakJso
         <span className="min-w-0 flex-1 space-y-1">
           <span className="block text-sm font-medium text-fg">{namaTanggal(baris.tanggal)}</span>
           <span className="flex flex-wrap items-center gap-1.5">
+            <ChipPlatform p={baris.platform} kecil className="shrink-0" />
             <ChipKonsep konsep={baris.konsep} />
             {baris.milik !== "kamu" && <span className="badge shrink-0 border border-border text-fg">{baris.milik}</span>}
             <ChipStatus status={baris.status} />
@@ -258,7 +268,7 @@ function Detail({
   onBasi,
 }: {
   baris: BarisAnakJson;
-  brief: BriefKonten;
+  brief: BriefAnak;
   pilihan: Pilihan[];
   bolehKirim: boolean;
   url: string;
@@ -272,6 +282,10 @@ function Detail({
 
   return (
     <div className="space-y-3 pt-1 text-sm">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-semibold text-muted">Platform</span>
+        <ChipPlatform p={b.platform} className="shrink-0" />
+      </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <ChipKonsep konsep={b.konsep} />
         <span className="badge shrink-0 border border-border text-fg">{b.milik === "kamu" ? "Kamu" : b.milik}</span>

@@ -7,18 +7,20 @@ import { NextResponse } from "next/server";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { atMidnight, toYmd } from "@/lib/services/leave/service";
 import {
-  KUNCI_BRIEF,
   KUNCI_POLA,
   POLA_BAWAAN,
   bolehDiganti,
   geserBulan,
   labelKonsep,
-  susunBulan,
+  pilihStatusAwal,
+  putusanHapusPlatform,
+  referensiEfektif,
+  susunRencana,
   type AnakKonten,
-  type BarisAda,
   type GrupKonten,
   type PolaHari,
   type PolaKonten,
+  type RencanaMurni,
 } from "@/lib/services/magang/konten";
 import { polaSchema, uraiBrief, type BriefKonten } from "@/lib/validators/magang-konten";
 
@@ -26,9 +28,10 @@ type Db = PrismaClient | Prisma.TransactionClient;
 
 // ── Setelan ───────────────────────────────────────────────────────────────────────────────────
 
-export async function muatBrief(db: Db): Promise<BriefKonten> {
-  const row = await db.setting.findUnique({ where: { key: KUNCI_BRIEF }, select: { value: true } });
-  return uraiBrief(row?.value);
+/** Brief satu platform (null bila platform tidak ada). Setting `magang_konten_brief` lama TIDAK dibaca lagi. */
+export async function muatBrief(db: Db, platformId: number): Promise<BriefKonten | null> {
+  const row = await db.magangKontenPlatform.findUnique({ where: { id: platformId }, select: { brief: true } });
+  return row ? uraiBrief(row.brief) : null;
 }
 
 export async function muatPola(db: Db): Promise<PolaKonten> {
@@ -54,6 +57,47 @@ export function uraiReferensi(v: unknown): TautanLabel[] {
     .filter((x): x is { label?: unknown; url?: unknown } => !!x && typeof x === "object")
     .map((x) => ({ label: typeof x.label === "string" ? x.label : "", url: typeof x.url === "string" ? x.url : "" }))
     .filter((x) => x.url || x.label);
+}
+
+// ── Platform ──────────────────────────────────────────────────────────────────────────────────
+
+/** Semua platform (termasuk arsip) urut tampil + jumlah baris jadwalnya. */
+export async function muatPlatform(db: Db) {
+  const rows = await db.magangKontenPlatform.findMany({
+    orderBy: [{ urutan: "asc" }, { id: "asc" }],
+    select: { id: true, nama: true, kunci: true, warna: true, ikon: true, urutan: true, aktif: true, diarsipkanAt: true, _count: { select: { konten: true } } },
+  });
+  return rows.map((p) => ({
+    id: p.id,
+    nama: p.nama,
+    kunci: p.kunci,
+    warna: p.warna,
+    ikon: p.ikon,
+    urutan: p.urutan,
+    aktif: p.aktif,
+    diarsipkanAt: p.diarsipkanAt?.toISOString() ?? null,
+    dipakai: p._count.konten,
+  }));
+}
+export type PlatformJson = Awaited<ReturnType<typeof muatPlatform>>[number];
+
+/** Hapus platform — hanya bila belum dipakai baris jadwal (409 {dipakai} → UI menawarkan Arsipkan). */
+export async function hapusPlatform(db: PrismaClient, id: number): Promise<Response | null> {
+  const dipakai = await db.magangKonten.count({ where: { platformId: id } });
+  const p = putusanHapusPlatform(dipakai);
+  if (!p.boleh) return NextResponse.json(p.body, { status: p.status });
+  try {
+    const r = await db.magangKontenPlatform.deleteMany({ where: { id } });
+    if (r.count === 0) return NextResponse.json({ message: "Platform tidak ditemukan." }, { status: 404 });
+  } catch (e) {
+    // Baris baru masuk di antara hitung & hapus → FOREIGN KEY (RESTRICT) menolak.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && (e.code === "P2003" || e.code === "P2014")) {
+      const q = putusanHapusPlatform(Math.max(1, await db.magangKonten.count({ where: { platformId: id } })));
+      if (!q.boleh) return NextResponse.json(q.body, { status: q.status });
+    }
+    throw e;
+  }
+  return null;
 }
 
 export async function muatKonsep(db: Db) {
@@ -105,7 +149,7 @@ export type AnakJson = Awaited<ReturnType<typeof muatAnak>>[number];
 
 /** Status awal baris baru: "belum-take" bila aktif, selain itu status aktif bukan-final pertama. */
 export function statusAwal(status: readonly StatusJson[]): StatusJson | null {
-  return status.find((s) => s.kunci === "belum-take" && s.aktif) ?? status.find((s) => s.aktif && !s.final) ?? null;
+  return pilihStatusAwal(status);
 }
 
 // ── Baris ─────────────────────────────────────────────────────────────────────────────────────
@@ -119,6 +163,7 @@ type BarisDb = Prisma.MagangKontenGetPayload<{ include: typeof includeBaris }>;
 export function serialisasiBaris(b: BarisDb) {
   return {
     id: b.id,
+    platformId: b.platformId,
     tanggal: toYmd(b.tanggal),
     konsepId: b.konsepId,
     pesertaId: b.pesertaId,
@@ -148,128 +193,79 @@ export async function liburBulan(db: Db, bulan: string) {
   return rows.map((h) => ({ tanggal: toYmd(h.date), nama: h.name }));
 }
 
-/** Semua yang dibutuhkan tabel pembina untuk satu bulan. */
-export async function dataBulan(db: Db, bulan: string) {
-  const [baris, konsep, status, grup, anak, brief, pola, libur] = await Promise.all([
-    db.magangKonten.findMany({ where: { tanggal: rentangBulan(bulan) }, orderBy: [{ tanggal: "asc" }, { urutan: "asc" }, { id: "asc" }], include: includeBaris }),
+/**
+ * Semua yang dibutuhkan tabel pembina untuk satu bulan. platform = id → baris & brief platform itu;
+ * "semua" → baris semua platform, brief null (UI meminta memilih platform dulu).
+ */
+export async function dataBulan(db: Db, bulan: string, platform: number | "semua") {
+  const satu = platform !== "semua";
+  const [baris, konsep, status, grup, anak, daftarPlatform, brief, pola, libur] = await Promise.all([
+    db.magangKonten.findMany({
+      where: { tanggal: rentangBulan(bulan), ...(satu ? { platformId: platform } : {}) },
+      orderBy: [{ tanggal: "asc" }, { urutan: "asc" }, { id: "asc" }],
+      include: includeBaris,
+    }),
     muatKonsep(db),
     muatStatus(db),
     muatGrup(db),
     muatAnak(db),
-    muatBrief(db),
+    muatPlatform(db),
+    satu ? muatBrief(db, platform) : null,
     muatPola(db),
     liburBulan(db, bulan),
   ]);
-  return { bulan, baris: baris.map(serialisasiBaris), konsep, status, grup, anak, brief, pola, libur };
+  return { bulan, platformId: satu ? platform : null, baris: baris.map(serialisasiBaris), konsep, status, grup, anak, platform: daftarPlatform, brief, pola, libur };
 }
 
 // ── Generator (rencana + simpan) ──────────────────────────────────────────────────────────────
 
-export type BarisRencana = { tanggal: string; konsepId: number; pesertaId: number | null; grupId: number | null; kode: number | null };
-export type Rencana = {
-  bulan: string;
-  baris: BarisRencana[];
-  /** Baris lama yang akan dihapus (mode ganti, hanya yang belum dikerjakan). */
-  hapus: number[];
-  dipertahankan: number;
-  dilewati: { tanggal: string; alasan: string }[];
-  masalah: string[];
-  statusAwalId: number | null;
-};
+export type BarisRencana = RencanaMurni["baris"][number];
+export type Rencana = RencanaMurni;
+
+/** Riwayat sebelum bulan yang dibaca untuk melanjutkan giliran kode anak (per platform). */
+const RIWAYAT_KODE = 60;
 
 /**
- * Susun rencana satu bulan dari DB. ganti=false → hanya tanggal yang belum punya baris. ganti=true →
- * baris bulan itu yang BELUM dikerjakan (bolehDiganti) dihapus dulu lalu disusun ulang; baris yang
- * sudah dikerjakan dipertahankan dan gilirannya ikut dihitung.
+ * Muat data rencana SATU platform lalu susun dengan susunRencana() (murni). ganti=false → hanya tanggal yang
+ * belum punya baris di platform ini; ganti=true → baris platform ini yang BELUM dikerjakan dihapus & disusun ulang.
+ * Riwayat giliran (kode anak terakhir, EMPATHY terakhir) juga hanya dari platform ini.
  */
-export async function rencanaBulan(db: Db, bulan: string, ganti: boolean): Promise<Rencana> {
-  const [konsep, status, grup, anak, pola, libur, ada] = await Promise.all([
+export async function rencanaBulan(db: Db, bulan: string, ganti: boolean, platformId: number): Promise<Rencana> {
+  const mulai = atMidnight(`${bulan}-01`);
+  const [konsep, status, grup, anak, pola, libur, ada, sebelum] = await Promise.all([
     muatKonsep(db),
     muatStatus(db),
     muatGrup(db),
     muatAnak(db),
     muatPola(db),
     liburBulan(db, bulan),
-    db.magangKonten.findMany({ where: { tanggal: rentangBulan(bulan) }, orderBy: [{ tanggal: "asc" }, { urutan: "asc" }, { id: "asc" }] }),
-  ]);
-  const masalah: string[] = [];
-  const awal = statusAwal(status);
-  if (!awal) masalah.push("Belum ada status aktif yang bukan final (mis. \"Belum take\") — tambahkan di Setelan → Status.");
-
-  const konsepAktif = new Map(konsep.filter((k) => k.aktif).map((k) => [k.kunci, k]));
-  const polaHari: PolaHari = {};
-  for (const h of [1, 2, 3, 4, 5, 6] as const) {
-    const kunci = pola.hari[h];
-    if (!kunci) continue;
-    if (konsepAktif.has(kunci)) polaHari[h] = kunci;
-    else masalah.push(`Pola hari ke-${h} memakai konsep "${kunci}" yang tidak ada / nonaktif — hari itu dilewati.`);
-  }
-  const empathy = pola.empathy && konsepAktif.has(pola.empathy) ? konsepAktif.get(pola.empathy)! : null;
-  if (pola.empathy && !empathy) masalah.push(`Konsep grup "${pola.empathy}" tidak ada / nonaktif — tidak ada hari grup.`);
-
-  const anakAktif = anak.filter((a) => a.aktif && a.kode != null);
-  const pesertaDariKode = new Map(anakAktif.map((a) => [a.kode!, a.pesertaId]));
-  const kodePeserta = new Map(anak.map((a) => [a.pesertaId, a.kode]));
-  const grupAktif = grup.filter((g) => g.aktif);
-  if (anakAktif.length === 0) masalah.push("Belum ada anak aktif yang punya kode — baris dibuat tanpa anak. Atur di Setelan → Kode anak.");
-
-  const hapus = ganti && awal ? ada.filter((b) => bolehDiganti(b, awal.id)).map((b) => b.id) : [];
-  const tetap = ada.filter((b) => !hapus.includes(b.id));
-
-  const mulai = atMidnight(`${bulan}-01`);
-  const [sebelum, empathyLalu] = await Promise.all([
+    db.magangKonten.findMany({ where: { platformId, tanggal: rentangBulan(bulan) }, orderBy: [{ tanggal: "asc" }, { urutan: "asc" }, { id: "asc" }] }),
     db.magangKonten.findMany({
-      where: { tanggal: { lt: mulai }, pesertaId: { not: null } },
+      where: { platformId, tanggal: { lt: mulai }, pesertaId: { not: null } },
       orderBy: [{ tanggal: "desc" }, { urutan: "desc" }, { id: "desc" }],
-      take: 60,
-      select: { pesertaId: true },
+      take: RIWAYAT_KODE,
     }),
-    empathy
-      ? db.magangKonten.findFirst({
-          where: { tanggal: { lt: mulai }, konsepId: empathy.id, grupId: { not: null } },
-          orderBy: [{ tanggal: "desc" }, { id: "desc" }],
-          select: { tanggal: true, grupId: true },
-        })
-      : null,
   ]);
-  const kodeLalu = sebelum.map((b) => kodePeserta.get(b.pesertaId!)).find((k) => k != null) ?? null;
-
-  const petaAda = new Map<string, BarisAda[]>();
-  for (const b of tetap) {
-    const t = toYmd(b.tanggal);
-    const l = petaAda.get(t) ?? [];
-    l.push({ kode: b.pesertaId != null ? (kodePeserta.get(b.pesertaId) ?? null) : null, grupId: b.grupId, empathy: !!empathy && b.konsepId === empathy.id });
-    petaAda.set(t, l);
-  }
-
-  const hasil = susunBulan({
+  const konsepGrup = pola.empathy ? konsep.find((k) => k.kunci === pola.empathy && k.aktif) : undefined;
+  const empathyLalu = konsepGrup
+    ? await db.magangKonten.findMany({
+        where: { platformId, tanggal: { lt: mulai }, konsepId: konsepGrup.id, grupId: { not: null } },
+        orderBy: [{ tanggal: "desc" }, { id: "desc" }],
+        take: 1,
+      })
+    : [];
+  return susunRencana({
     bulan,
-    kode: [...pesertaDariKode.keys()],
-    grupUrut: grupAktif.map((g) => g.id),
-    polaHari,
-    empathyKonsep: empathy?.kunci ?? null,
-    selangEmpathy: pola.selangHari,
-    mulaiKodeSetelah: kodeLalu,
-    empathyTerakhir: empathyLalu ? { tanggal: toYmd(empathyLalu.tanggal), grupId: empathyLalu.grupId } : null,
-    libur: new Set(libur.map((l) => l.tanggal)),
-    ada: petaAda,
+    ganti,
+    platformId,
+    konsep,
+    status,
+    grup,
+    anak,
+    pola,
+    libur: libur.map((l) => l.tanggal),
+    baris: [...ada, ...sebelum, ...empathyLalu].map((b) => ({ ...b, tanggal: toYmd(b.tanggal) })),
   });
-
-  return {
-    bulan,
-    baris: hasil.baris.map((b) => ({
-      tanggal: b.tanggal,
-      konsepId: konsepAktif.get(b.konsep)!.id,
-      pesertaId: b.kode != null ? (pesertaDariKode.get(b.kode) ?? null) : null,
-      grupId: b.grupId,
-      kode: b.kode,
-    })),
-    hapus,
-    dipertahankan: tetap.length,
-    dilewati: hasil.dilewati,
-    masalah,
-    statusAwalId: awal?.id ?? null,
-  };
 }
 
 /** Tulis rencana dalam SATU transaksi (tanpa DDL). Baris yang dihapus diperiksa ulang di dalamnya. */
@@ -279,17 +275,20 @@ export async function simpanRencana(db: PrismaClient, r: Rencana, oleh: { userId
   return db.$transaction(async (tx) => {
     let dihapus = 0;
     if (r.hapus.length) {
-      const calon = await tx.magangKonten.findMany({ where: { id: { in: r.hapus } } });
+      const calon = await tx.magangKonten.findMany({ where: { id: { in: r.hapus }, platformId: r.platformId } });
       const aman = calon.filter((b) => bolehDiganti(b, statusAwalId)).map((b) => b.id);
       dihapus = (await tx.magangKonten.deleteMany({ where: { id: { in: aman } } })).count;
     }
-    // Tanggal yang (sejak pratinjau) sudah terisi orang lain tidak diisi dua kali.
+    // Tanggal yang (sejak pratinjau) sudah terisi orang lain DI PLATFORM INI tidak diisi dua kali.
     const terisi = new Set(
-      (await tx.magangKonten.findMany({ where: { tanggal: rentangBulan(r.bulan) }, select: { tanggal: true } })).map((b) => toYmd(b.tanggal))
+      (await tx.magangKonten.findMany({ where: { platformId: r.platformId, tanggal: rentangBulan(r.bulan) }, select: { tanggal: true } })).map((b) =>
+        toYmd(b.tanggal)
+      )
     );
     const data = r.baris
       .filter((b) => !terisi.has(b.tanggal))
       .map((b) => ({
+        platformId: r.platformId,
         tanggal: atMidnight(b.tanggal),
         konsepId: b.konsepId,
         pesertaId: b.pesertaId,
@@ -310,14 +309,16 @@ export async function simpanRencana(db: PrismaClient, r: Rencana, oleh: { userId
  */
 export async function periksaRujukan(
   db: Db,
-  r: { konsepId?: number; pesertaId?: number | null; grupId?: number | null; statusId?: number }
+  r: { platformId?: number; konsepId?: number; pesertaId?: number | null; grupId?: number | null; statusId?: number }
 ): Promise<{ galat: string } | { status: { id: number; final: boolean } | null }> {
-  const [konsep, peserta, grup, status] = await Promise.all([
+  const [platform, konsep, peserta, grup, status] = await Promise.all([
+    r.platformId ? db.magangKontenPlatform.findUnique({ where: { id: r.platformId }, select: { id: true } }) : true,
     r.konsepId ? db.magangKontenKonsep.findUnique({ where: { id: r.konsepId }, select: { id: true } }) : true,
     r.pesertaId ? db.magangPeserta.findFirst({ where: { id: r.pesertaId, employee: { deletedAt: null } }, select: { id: true } }) : true,
     r.grupId ? db.magangKontenGrup.findUnique({ where: { id: r.grupId }, select: { id: true } }) : true,
     r.statusId ? db.magangKontenStatus.findUnique({ where: { id: r.statusId }, select: { id: true, final: true } }) : null,
   ]);
+  if (!platform) return { galat: "Platform tidak ditemukan." };
   if (!konsep) return { galat: "Konsep tidak ditemukan." };
   if (!peserta) return { galat: "Anak tidak ditemukan." };
   if (!grup) return { galat: "Grup tidak ditemukan." };
@@ -371,22 +372,39 @@ export async function pesertaKonten(db: Db, employeeId: number) {
   return { id: p.id, kode: p.kodeKonten, grup, grupIds: grup.map((g) => g.id) };
 }
 
+/** Platform untuk HP anak: nama/warna/ikon + brief (referensi khusus platform dipakai lewat referensiEfektif). */
+export type PlatformAnak = { id: number; nama: string; warna: string; ikon: string | null; brief: BriefKonten };
+
+/** Platform (+ brief) untuk daftar id — dipakai rute HP anak. */
+export async function muatPlatformAnak(db: Db, ids: readonly number[]): Promise<Map<number, PlatformAnak>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db.magangKontenPlatform.findMany({ where: { id: { in: [...new Set(ids)] } }, select: { id: true, nama: true, warna: true, ikon: true, brief: true } });
+  return new Map(rows.map((p) => [p.id, { id: p.id, nama: p.nama, warna: p.warna, ikon: p.ikon, brief: uraiBrief(p.brief) }]));
+}
+
+type PlatformRingkas = { id: number; nama: string; warna: string; ikon: string | null; brief?: Pick<BriefKonten, "referensi"> | null };
+
 /**
  * Baris untuk HP anak — objek baru dari medan yang diizinkan (tanpa id peserta lain / pengubah).
- * milik = "kamu" atau nama grup.
+ * milik = "kamu" atau nama grup. platform = label platform baris itu; referensi konsep = khusus platform bila ada.
  */
 export function serialisasiBarisAnak(
-  b: { id: number; tanggal: Date; konsepId: number; pesertaId: number | null; grupId: number | null; statusId: number; judul: string | null; ref: string | null; caption: string | null; linkFootage: string | null; linkEkspor: string | null; catatan: string | null; usulan: boolean; selesaiAt: Date | null },
+  b: { id: number; platformId: number; tanggal: Date; konsepId: number; pesertaId: number | null; grupId: number | null; statusId: number; judul: string | null; ref: string | null; caption: string | null; linkFootage: string | null; linkEkspor: string | null; catatan: string | null; usulan: boolean; selesaiAt: Date | null },
   konsep: ReadonlyMap<number, KonsepJson>,
   status: ReadonlyMap<number, StatusJson>,
-  grup: ReadonlyMap<number, string>
+  grup: ReadonlyMap<number, string>,
+  platform: ReadonlyMap<number, PlatformRingkas>
 ) {
   const k = konsep.get(b.konsepId);
   const s = status.get(b.statusId);
+  const p = platform.get(b.platformId);
   return {
     id: b.id,
     tanggal: toYmd(b.tanggal),
-    konsep: k ? { label: k.label, warna: k.warna, referensi: k.referensi } : { label: "(konsep dihapus)", warna: "putih", referensi: [] },
+    platform: p ? { id: p.id, nama: p.nama, warna: p.warna, ikon: p.ikon } : { id: b.platformId, nama: "(platform dihapus)", warna: "putih", ikon: null },
+    konsep: k
+      ? { label: k.label, warna: k.warna, referensi: referensiEfektif(k.referensi, p?.brief?.referensi, k.id).referensi }
+      : { label: "(konsep dihapus)", warna: "putih", referensi: [] },
     milik: b.grupId != null ? (grup.get(b.grupId) ?? "Grup") : "kamu",
     status: s ? { id: s.id, nama: s.nama, warna: s.warna, final: s.final } : { id: b.statusId, nama: "-", warna: "abu", final: false },
     judul: b.judul,

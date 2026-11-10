@@ -374,3 +374,67 @@ LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tia
   `diubahOlehId` baris #1 kini akun admin). Konsep #1 `{referensi: sama}` (jalur panel brief) → warna tetap pink. Pembina aman menyunting sel
   & menyimpan Catatan & Brief.
 - Skrip pemulihan TIDAK dijalankan (tidak ada data hilang).
+
+## Jadwal konten multi-platform & responsif (feat/magang-konten-platform — BELUM dideploy)
+
+Satu tim magang membuat konten untuk beberapa akun/brand (Voliko Print, Exindo, Xposer, Epic Jogja, Voliko Sport). Tiap baris
+jadwal kini milik SATU **platform**; tiap platform punya jadwal, brief, dan giliran sendiri.
+
+- **Model** (migrasi `20261113000000_magang_konten_platform`, ditulis tangan): `MagangKontenPlatform` (`nama` ≤80, unik tanpa peduli huruf
+  besar — dicek di service; `kunci` slug unik TETAP (tidak ikut ganti nama); `warna` kunci palet seperti konsep; `ikon` opsional dari set SVG
+  kecil `IKON_PLATFORM` (instagram/tiktok/youtube/facebook/toko/web/kamera — hiasan, nama selalu tertulis); `brief` Json; `urutan`; `aktif` +
+  `diarsipkanAt`). `MagangKonten.platformId` Int NOT NULL, FK RESTRICT, indeks `(platformId, tanggal)`.
+- **Migrasi**: CREATE TABLE → `INSERT IGNORE` platform **Voliko Print** (`voliko-print`, urutan 1, aktif) → brief Setting `magang_konten_brief`
+  DISALIN ke brief Voliko Print (`UPDATE … WHERE brief IS NULL AND JSON_VALID`) → kolom `platformId` NULL → `UPDATE … SET platformId = Voliko
+  Print WHERE platformId IS NULL` → NOT NULL → indeks + FK. Tanpa DELETE/DROP. **Setting `magang_konten_brief` TIDAK dihapus** (cadangan; aplikasi
+  tidak membacanya lagi). Di instalasi non-Voliko platform pertama tetap bernama "Voliko Print" — ganti nama lewat Kelola platform (kunci tetap).
+- **Bukti** (MariaDB 10.4 lokal, DB sekali pakai, dihapus sesudahnya): (a) DB kosong + semua migrasi → `prisma migrate diff --from-url …
+  --to-schema-datamodel` = *No difference*; (b) DB di migrasi `20261112000000` diisi seperti produksi (24 baris, 4 konsep, 3 grup + 7 anggota,
+  brief dengan caption/hashtag/emoji/kutip) → migrasi → 24/24 baris `platformId` = Voliko Print, 0 tanpa platform, brief Voliko Print **identik
+  byte** dengan Setting (MD5 sama), checksum MD5 semua kolom lain MagangKonten (termasuk `updatedAt`) sebelum = sesudah, Setting tetap ada, diff
+  skema kosong; langkah data diulang manual → 0 baris berubah. (MySQL 8 menormalkan spasi JSON — isi sama, MD5 bisa beda.)
+- **Yang tetap GLOBAL** (paling sederhana; satu tim anak yang sama): konsep, status, grup + anggota, kode anak, pola hari. Referensi konsep:
+  `MagangKontenKonsep.referensi` = **bawaan semua platform**; brief platform boleh berisi `referensi: {"<konsepId>": [{label,url}]}` — daftar
+  TIDAK kosong menggantikan bawaan untuk platform itu (`referensiEfektif`), kosong = pakai bawaan. Bawaan diubah di Setelan → Konsep, khusus
+  platform di panel Catatan & brief.
+- **Generator per platform** (`susunRencana()` murni di `konten.ts`; `rencanaBulan(db, bulan, ganti, platformId)` hanya memuat baris platform
+  itu): *Buat jadwal bulan berikut* selalu untuk SATU platform. Tanggal terisi, kode anak terakhir sebelum bulan itu, dan EMPATHY terakhir
+  (giliran grup + irama 14 hari) dihitung **hanya dari baris platform itu** — platform lain tidak memengaruhi. Akibatnya anak yang sama bisa
+  mendapat jadwal di dua platform pada hari yang sama (memang diinginkan: tiap akun butuh konten harian). Platform baru tanpa riwayat: mulai
+  kode terkecil, hari grup Sabtu kedua grup pertama. *Ganti* hanya menghapus baris platform itu yang belum dikerjakan. Platform diarsipkan → 409.
+- **API** (`requireManager`): `GET/POST /api/magang/konten/platform` (POST: nama unik, kunci slug, urutan terakhir+1), `PATCH/DELETE
+  …/platform/[id]` (PATCH sebagian `ubahPlatformSchema` .strict() tanpa `.default()`, hanya nama/warna/ikon/urutan, route menulis
+  `tanpaUndefined`; DELETE → 409 `{message, dipakai}` bila punya baris), `PUT …/platform/urutan` `{urutan:[semua id]}`, `POST …/[id]/arsip`
+  (aktif=false + diarsipkanAt) & `…/[id]/buka-arsip`, `GET/PUT …/platform/[id]/brief` (dokumen utuh `briefPlatformSchema`; referensi hanya id
+  konsep yang ada, daftar kosong dibuang). `GET /api/magang/konten?bulan=&platform=<id|semua>` (tanpa `platform` → platform aktif pertama;
+  `semua` → brief null). `POST /api/magang/konten` & `/buat` wajib `platformId`; `PATCH [id]` boleh `platformId` (pindah platform);
+  `/setujui` boleh `platformId`. Rute lama `/api/magang/konten/brief` DIHAPUS (satu-satunya pemakai = panel brief, sudah pindah).
+- **Dasbor** `/magang/konten?bulan=&platform=`: tab platform (titik warna + ikon + nama; arsip disembunyikan kecuali *Tampilkan arsip*; tab
+  bergulir di HP, membungkus di ≥768) + **Semua platform** (kolom/lencana PLATFORM yang bisa diganti, *Buat jadwal* & tambah baris nonaktif
+  dengan keterangan). **Kelola platform**: tambah, ubah nama/warna/ikon (hanya kolom yang berubah dikirim), naik/turun, arsipkan/buka arsip,
+  hapus dua langkah → bila 409 ditawarkan **Arsipkan saja**. Panel Catatan & brief per platform terpilih.
+- **Responsif**: <768 px **kartu per hari** (`KartuKonten`: kepala tanggal + pemisah kuning tiap Minggu, kartu berisi konsep, status, CODE/grup
+  + nama, platform (di Semua), judul, referensi, footage, ekspor, caption, catatan, lencana Usulan + *Setujui*, *Tambah*, *Hapus* — penyunting
+  yang sama dengan tabel, sasaran ≥44 px, isian 16 px); 768–1279 tabel bergulir ke samping dengan NO+TANGGAL lengket, brief di **laci**
+  kanan (`Laci`: Esc/tirai/Tutup, fokus kembali); ≥1280 tata letak lama (brief di samping, bawaan tampil ≥1536). Saringan membungkus.
+- **HP anak**: tiap kartu/daftar berlabel platform; brief (catatan, font, preset, drive, caption+hashtag) diambil dari platform baris itu;
+  referensi konsep = khusus platform bila ada. Rute GET mengirim `brief` per id platform (tanpa referensi mentah).
+- **Pantau guru**: tetap hitungan saja — total + `perPlatform [{platform, terjadwal, selesai}]` (`serialKontenGuru`, tanpa judul/tautan/
+  catatan); tes kunci terlarang tetap lulus.
+- **Skrip**: `tools/magang/voliko-platform-konten.ts` (`TZ=Asia/Jakarta npx tsx …` = dry-run; `--jalankan` = cadangan JSON
+  `~/cadangan/magang-platform-<waktu>` lalu satu transaksi): batal bila migrasi belum ada / `voliko-print` tidak ada; buat Exindo, Xposer,
+  Epic Jogja, Voliko Sport (urutan 2–5, aktif, brief kosong, warna netral) dengan upsert per kunci (yang sudah ada TIDAK ditimpa; nama sama
+  beda kunci → dilewati); cetak jumlah baris Voliko Print (peringatan bila ≠ 24 / ada baris tanpa platform). Diuji: dry-run → jalankan (4 dibuat)
+  → ulang = 0. `tools/magang/voliko-jadwal-konten.ts` kini menulis baris & brief ke Voliko Print (cek dua migrasi; duplikat dicek per platform);
+  diuji di DB kosong: 24 baris + brief ke Voliko Print, ulang → 0 baris, tanpa peringatan brief.
+- **Deploy** `tools/magang/deploy-konten-platform-voliko.sh <SHA>` (ff-only dari `3d74d30`; satu-satunya berkas migrasi baru yang boleh =
+  `20261113000000_magang_konten_platform`; cadangan DB+.env+storage; potret kolom teks sebelum/sesudah (exit 2 bila ada yang kosong); **build
+  dulu, lalu migrasi, lalu restart** `ratemystaff` saja (jendela kode lama vs NOT NULL hanya detik); sesudahnya semua baris wajib punya platform
+  sah (exit 3) + hitungan per platform + MD5 brief). Skrip data platform = langkah terpisah sesudahnya.
+- **Tes** `tests/magang-konten-platform.test.ts`: bentuk SQL migrasi (INSERT IGNORE Voliko Print, UPDATE platformId WHERE NULL berurutan sebelum
+  NOT NULL/FK, salin brief bila NULL, tanpa DELETE/DROP), hapus 409 + arsip/buka arsip, urutan, nama unik, PATCH sebagian platform tidak
+  mengembalikan warna/ikon/urutan, `platformId` wajib, brief per platform (Setting lama & Json terbaca sama, referensi), generator per platform
+  (baris platform lain tidak mengubah giliran kode/grup/tanggal terisi; platform lain pakai riwayatnya; ganti per platform), label platform di
+  HP anak & ringkasan guru (tanpa bocor), rencana skrip data idempoten.
+- **Tangkapan** (data fiktif, `.tangkapan/platform-*.png`): 1366 tab & Semua platform, Kelola platform (hapus → tawaran arsip), 768 (tabel
+  bergulir, NO/TANGGAL lengket), 360 kartu / sunting judul di kartu / laci brief, HP anak berlabel platform.

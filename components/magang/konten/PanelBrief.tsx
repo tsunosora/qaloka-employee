@@ -3,8 +3,9 @@
 import { useId, useState } from "react";
 import { api } from "@/lib/fetcher";
 import { IconCheck, IconCopy, IconLink, IconPencil, IconPlus, IconTrash } from "@/components/ui/icons";
-import { tautanPendek, tautanSah } from "@/lib/services/magang/konten";
-import { FOKUS, latarWarna, type BriefKonten, type KonsepJson } from "@/components/magang/konten/tipe";
+import { referensiEfektif, tautanPendek, tautanSah } from "@/lib/services/magang/konten";
+import { ChipPlatform } from "@/components/magang/konten/IkonPlatform";
+import { FOKUS, latarWarna, type BriefKonten, type KonsepJson, type PlatformJson } from "@/components/magang/konten/tipe";
 
 type Tautan = { label: string; url: string };
 
@@ -104,10 +105,11 @@ const tautanBeres = (l: Tautan[]) => l.map((t) => ({ label: t.label.trim(), url:
 const adaSalah = (l: Tautan[]) => l.some((t) => t.url.trim() && !tautanSah(t.url.trim()));
 
 /**
- * Panel kiri "Catatan & Brief" seperti sheet pembina: drive pengumpulan, note, font, preset, referensi per
- * konsep (dari konsep.referensi), caption + hashtag (tombol Salin). Mode baca ↔ mode ubah.
+ * Panel "Catatan & Brief" SATU platform seperti sheet pembina: drive pengumpulan, note, font, preset, referensi per
+ * konsep, caption + hashtag (tombol Salin). Referensi: daftar khusus platform ini; kosong → referensi bawaan konsep
+ * (Setelan → Konsep, berlaku untuk semua platform). Mode baca ↔ mode ubah. Disimpan utuh ke brief platform.
  */
-export function PanelBrief({ brief, konsep, onTersimpan }: { brief: BriefKonten; konsep: KonsepJson[]; onTersimpan: () => void }) {
+export function PanelBrief({ platform, brief, konsep, onTersimpan }: { platform: PlatformJson; brief: BriefKonten; konsep: KonsepJson[]; onTersimpan: () => void }) {
   const id = useId();
   const [ubah, setUbah] = useState(false);
   const [form, setForm] = useState(brief);
@@ -119,7 +121,7 @@ export function PanelBrief({ brief, konsep, onTersimpan }: { brief: BriefKonten;
 
   function mulai() {
     setForm(brief);
-    setRefs(Object.fromEntries(konsepAktif.map((k) => [k.id, k.referensi])));
+    setRefs(Object.fromEntries(konsepAktif.map((k) => [k.id, brief.referensi[String(k.id)] ?? []])));
     setGalat("");
     setOk("");
     setUbah(true);
@@ -130,13 +132,16 @@ export function PanelBrief({ brief, konsep, onTersimpan }: { brief: BriefKonten;
     setBusy(true);
     setGalat("");
     try {
-      await api("/api/magang/konten/brief", { method: "PUT", body: JSON.stringify({ ...form, drive: tautanBeres(form.drive) }) });
+      // Referensi konsep yang tidak tampil (nonaktif) dipertahankan apa adanya.
+      const referensi: Record<string, Tautan[]> = { ...brief.referensi };
       for (const k of konsepAktif) {
         const baru = tautanBeres(refs[k.id] ?? []);
-        if (JSON.stringify(baru) !== JSON.stringify(k.referensi)) await api(`/api/magang/konten/konsep/${k.id}`, { method: "PATCH", body: JSON.stringify({ referensi: baru }) });
+        if (baru.length) referensi[String(k.id)] = baru;
+        else delete referensi[String(k.id)];
       }
+      await api(`/api/magang/konten/platform/${platform.id}/brief`, { method: "PUT", body: JSON.stringify({ ...form, drive: tautanBeres(form.drive), referensi }) });
       setUbah(false);
-      setOk("Catatan & brief tersimpan.");
+      setOk(`Catatan & brief ${platform.nama} tersimpan.`);
       onTersimpan();
     } catch (e) {
       setGalat(e instanceof Error ? e.message : "Gagal menyimpan.");
@@ -151,9 +156,12 @@ export function PanelBrief({ brief, konsep, onTersimpan }: { brief: BriefKonten;
   if (ubah)
     return (
       <section aria-labelledby={`${id}-j`} className="glass space-y-4 rounded-2xl p-4">
-        <h2 id={`${id}-j`} className="font-display text-sm font-bold text-fg">
-          Ubah catatan & brief
-        </h2>
+        <div className="space-y-1.5">
+          <h2 id={`${id}-j`} className="font-display text-sm font-bold text-fg">
+            Ubah catatan & brief
+          </h2>
+          <ChipPlatform p={platform} />
+        </div>
         <div>
           {judul("Drive pengumpulan file")}
           <div className="mt-1.5">
@@ -183,11 +191,15 @@ export function PanelBrief({ brief, konsep, onTersimpan }: { brief: BriefKonten;
         </div>
         {konsepAktif.length > 0 && (
           <div className="space-y-3">
-            {judul("Referensi konten")}
+            {judul(`Referensi konten khusus ${platform.nama}`)}
+            <p className="text-xs text-muted">Kosongkan untuk memakai referensi bawaan konsep (Setelan → Konsep, sama untuk semua platform).</p>
             {konsepAktif.map((k) => (
               <div key={k.id}>
                 <p className="mb-1 text-xs font-semibold text-fg">{k.label}</p>
                 <EditorTautan nilai={refs[k.id] ?? []} onChange={(v) => setRefs({ ...refs, [k.id]: v })} labelTambah="Tambah referensi" contohLabel="mis. Contoh video" />
+                {(refs[k.id] ?? []).length === 0 && k.referensi.length > 0 && (
+                  <p className="mt-1 text-xs text-muted">Dipakai sekarang: bawaan ({k.referensi.map((t) => t.label || tautanPendek(t.url)).join(", ")}).</p>
+                )}
               </div>
             ))}
           </div>
@@ -222,11 +234,14 @@ export function PanelBrief({ brief, konsep, onTersimpan }: { brief: BriefKonten;
 
   return (
     <section aria-labelledby={`${id}-j`} className="glass space-y-4 rounded-2xl p-4 text-sm">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id={`${id}-j`} className="font-display text-sm font-bold text-fg">
-          Catatan & brief
-        </h2>
-        <button type="button" onClick={mulai} className={`btn-ghost h-9 px-3 text-xs ${FOKUS}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 space-y-1.5">
+          <h2 id={`${id}-j`} className="font-display text-sm font-bold text-fg">
+            Catatan & brief
+          </h2>
+          <ChipPlatform p={platform} />
+        </div>
+        <button type="button" onClick={mulai} className={`btn-ghost h-11 shrink-0 px-3 text-xs ${FOKUS}`} aria-label={`Ubah catatan & brief ${platform.nama}`}>
           <IconPencil className="text-[14px]" aria-hidden="true" /> Ubah
         </button>
       </div>
@@ -260,16 +275,22 @@ export function PanelBrief({ brief, konsep, onTersimpan }: { brief: BriefKonten;
       <div className="space-y-2">
         {judul("Referensi konten")}
         {konsepAktif.length === 0 && <p className="text-xs text-muted">Belum ada konsep. Tambahkan di Setelan.</p>}
-        {konsepAktif.map((k) => (
-          <div key={k.id} className="space-y-1">
-            <p className="inline-block rounded-md px-1.5 py-0.5 text-xs font-semibold text-fg" style={latarWarna(k.warna, 35)}>
-              {k.label}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {k.referensi.length ? k.referensi.map((t, i) => <ChipTautan key={i} t={t} kecil />) : <span className="text-xs text-muted">Belum ada referensi.</span>}
+        {konsepAktif.map((k) => {
+          const r = referensiEfektif(k.referensi, brief.referensi, k.id);
+          return (
+            <div key={k.id} className="space-y-1">
+              <p className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-block rounded-md px-1.5 py-0.5 text-xs font-semibold text-fg" style={latarWarna(k.warna, 35)}>
+                  {k.label}
+                </span>
+                {r.sumber === "bawaan" && r.referensi.length > 0 && <span className="text-[11px] text-muted">bawaan semua platform</span>}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {r.referensi.length ? r.referensi.map((t, i) => <ChipTautan key={i} t={t} kecil />) : <span className="text-xs text-muted">Belum ada referensi.</span>}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">

@@ -11,6 +11,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { hariKerja, kerajinan } from "./jurnal";
 import { kunciSekolah, sekolahSama } from "./sekolah";
+import { ringkasKontenPlatform } from "./konten";
 
 export const PANTAU_COOKIE = "rms_pantau";
 /** Umur sesi guru: 8 jam. */
@@ -440,6 +441,14 @@ export function serialSideQuest(
     kategori: (progres?.kategori ?? []).map((k) => ({ kunci: k.kategori, label: k.label, selesai: k.selesai, menunggu: k.menunggu, total: k.total })),
     disetujui: disetujui.map((d) => ({ judul: d.judul, kategori: d.kategoriLabel, tanggal: d.tanggal })),
   };
+}
+
+/**
+ * Jadwal konten untuk guru: HANYA hitungan total & per platform (nama platform) — tanpa judul, tautan, caption,
+ * catatan. Masukan boleh baris lengkap; keluaran objek baru.
+ */
+export function serialKontenGuru(baris: readonly { platform: { nama: string; urutan: number }; status: { final: boolean } }[]) {
+  return ringkasKontenPlatform(baris.map((b) => ({ platform: b.platform.nama, urutanPlatform: b.platform.urutan, final: b.status.final })));
 }
 
 export function serialRaporRingkas(r: {

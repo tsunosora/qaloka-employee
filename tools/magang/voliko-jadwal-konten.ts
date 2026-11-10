@@ -11,13 +11,16 @@
  *   --bantuan             Tampilkan teks ini.
  *
  * Aman diulang (idempoten), satu transaksi tanpa DDL:
- *   - Batal bila migrasi 20261112000000_magang_jadwal_konten belum terpasang.
+ *   - Batal bila migrasi 20261112000000_magang_jadwal_konten ATAU 20261113000000_magang_konten_platform belum terpasang.
+ *   - Sejak multi-platform (13 Nov 2026) semua baris & brief masuk ke platform "Voliko Print" (kunci voliko-print,
+ *     dibuat migrasi); platform itu tidak ada = batal.
  *   - Anak dicocokkan dengan MagangPeserta.id DAN nama panggilan (beda = batal). Kode anak hanya dipasang bila
  *     kolomnya masih kosong atau sudah sama; kode yang dipegang anak lain = batal.
  *   - Konsep dicari per kunci, status per kunci, grup per nama: belum ada → dibuat; sudah ada → dibiarkan
  *     (grup: anggota yang belum ada ditambahkan).
- *   - Brief (Setting magang_konten_brief) hanya ditulis bila belum ada; sudah ada & berbeda → dibiarkan + peringatan.
- *   - Baris dengan (tanggal, konsep, kode/grup) yang sama sudah ada → dilewati.
+ *   - Brief (MagangKontenPlatform.brief Voliko Print) hanya ditulis bila masih kosong; sudah ada & berbeda → dibiarkan
+ *     + peringatan. Setting magang_konten_brief lama tidak disentuh lagi.
+ *   - Baris dengan (platform, tanggal, konsep, kode/grup) yang sama sudah ada → dilewati.
  *
  * Kode keluar ≠ 0 bila dibatalkan / gagal.
  */
@@ -25,11 +28,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { atMidnight, toYmd } from "@/lib/services/leave/service";
-import { KUNCI_BRIEF, hariKe, labelKonsep, namaTanggal } from "@/lib/services/magang/konten";
-import { briefSchema, grupKontenSchema, konsepSchema } from "@/lib/validators/magang-konten";
-import { ANAK_VOLIKO, BARIS_VOLIKO, BRIEF_VOLIKO, GRUP_VOLIKO, KONSEP_VOLIKO, MIGRASI_KONTEN } from "./data/voliko-konten-nov2026";
+import { hariKe, labelKonsep, namaTanggal } from "@/lib/services/magang/konten";
+import { briefSchema, grupKontenSchema, konsepSchema, uraiBrief } from "@/lib/validators/magang-konten";
+import { ANAK_VOLIKO, BARIS_VOLIKO, BRIEF_VOLIKO, GRUP_VOLIKO, KONSEP_VOLIKO, KUNCI_PLATFORM_VOLIKO, MIGRASI_KONTEN, MIGRASI_PLATFORM } from "./data/voliko-konten-nov2026";
 
 const WIB_MENIT = 7 * 60;
 const STATUS_WAJIB = [
@@ -89,14 +92,16 @@ async function cekMigrasi(db: PrismaClient) {
   const tabel = await db.$queryRaw<{ n: bigint | number }[]>`
     SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'MagangKonten'`;
   if (Number(tabel[0]?.n ?? 0) === 0) throw new Batal(`Tabel MagangKonten belum ada — jalankan dulu migrasi ${MIGRASI_KONTEN} (npx prisma migrate deploy).`);
-  let catatan: { finished_at: Date | null; rolled_back_at: Date | null }[] = [];
-  try {
-    catatan = await db.$queryRaw`SELECT finished_at, rolled_back_at FROM _prisma_migrations WHERE migration_name = ${MIGRASI_KONTEN}`;
-  } catch {
-    throw new Batal("Tabel _prisma_migrations tidak terbaca — basis data ini tidak dikelola Prisma Migrate?");
+  for (const migrasi of [MIGRASI_KONTEN, MIGRASI_PLATFORM]) {
+    let catatan: { finished_at: Date | null; rolled_back_at: Date | null }[] = [];
+    try {
+      catatan = await db.$queryRaw`SELECT finished_at, rolled_back_at FROM _prisma_migrations WHERE migration_name = ${migrasi}`;
+    } catch {
+      throw new Batal("Tabel _prisma_migrations tidak terbaca — basis data ini tidak dikelola Prisma Migrate?");
+    }
+    if (!catatan.some((c) => c.finished_at && !c.rolled_back_at)) throw new Batal(`Migrasi ${migrasi} belum tercatat selesai di _prisma_migrations.`);
+    console.log(`✓ Migrasi ${migrasi} terpasang.`);
   }
-  if (!catatan.some((c) => c.finished_at && !c.rolled_back_at)) throw new Batal(`Migrasi ${MIGRASI_KONTEN} belum tercatat selesai di _prisma_migrations.`);
-  console.log(`✓ Migrasi ${MIGRASI_KONTEN} terpasang.`);
 }
 
 function cekZonaWaktu(tanggal: readonly Date[]) {
@@ -155,12 +160,14 @@ async function utama() {
     if (masalah.length) throw new Batal(`Data anak tidak cocok:\n  - ${masalah.join("\n  - ")}`);
     console.log(`✓ ${ANAK_VOLIKO.length} anak cocok (id + nama panggilan). Kode baru dipasang: ${pasangKode.length}.`);
 
-    const [konsepAda, statusAda, grupAda, barisAda, briefAda] = await Promise.all([
+    const platform = await db.magangKontenPlatform.findUnique({ where: { kunci: KUNCI_PLATFORM_VOLIKO } });
+    if (!platform) throw new Batal(`Platform "${KUNCI_PLATFORM_VOLIKO}" tidak ada (seharusnya dibuat migrasi ${MIGRASI_PLATFORM}).`);
+    console.log(`✓ Platform tujuan: ${platform.nama} (id ${platform.id}${platform.aktif ? "" : ", DIARSIPKAN"}).`);
+    const [konsepAda, statusAda, grupAda, barisAda] = await Promise.all([
       db.magangKontenKonsep.findMany(),
       db.magangKontenStatus.findMany(),
       db.magangKontenGrup.findMany({ include: { anggota: true } }),
-      db.magangKonten.findMany({ where: { tanggal: { gte: atMidnight("2026-11-01"), lt: atMidnight("2026-12-01") } } }),
-      db.setting.findUnique({ where: { key: KUNCI_BRIEF } }),
+      db.magangKonten.findMany({ where: { platformId: platform.id, tanggal: { gte: atMidnight("2026-11-01"), lt: atMidnight("2026-12-01") } } }),
     ]);
     cekZonaWaktu([...barisAda.map((b) => b.tanggal), ...peserta.map((p) => p.mulai)]);
 
@@ -172,9 +179,10 @@ async function utama() {
       const ada = grupAda.find((x) => x.nama === g.nama);
       return ada ? g.anggota.map((k) => kodeKePeserta.get(k)!).filter((pid) => !ada.anggota.some((a) => a.pesertaId === pid)).map((pid) => ({ grup: g.nama, pesertaId: pid })) : [];
     });
-    const briefJson = JSON.stringify(BRIEF_VOLIKO);
-    const tulisBrief = !briefAda?.value;
-    if (briefAda?.value && briefAda.value !== briefJson) console.log("PERINGATAN: brief sudah ada dan berbeda dari data — DIBIARKAN (mungkin sudah disunting pembina).");
+    const briefData = { ...BRIEF_VOLIKO, drive: BRIEF_VOLIKO.drive.map((d) => ({ ...d })), referensi: {} };
+    const tulisBrief = platform.brief == null;
+    if (!tulisBrief && JSON.stringify({ ...uraiBrief(platform.brief), referensi: undefined }) !== JSON.stringify(BRIEF_VOLIKO))
+      console.log("PERINGATAN: brief Voliko Print sudah ada dan berbeda dari data — DIBIARKAN (mungkin sudah disunting pembina).");
 
     // ── Rencana baris ──
     const idKonsepAda = new Map(konsepAda.map((k) => [k.kunci, k.id]));
@@ -202,9 +210,9 @@ async function utama() {
     for (const g of GRUP_VOLIKO)
       console.log(`  ${grupBaru.includes(g) ? "+ BUAT " : "= ADA  "} ${g.nama} (urutan ${g.urutan}): ${g.anggota.map((k) => `${k} ${panggilanKode.get(k)}`).join(", ")}`);
     for (const t of anggotaTambah) console.log(`    + anggota ${t.grup}: peserta ${t.pesertaId}`);
-    console.log(`\n== Brief ==  ${tulisBrief ? "+ TULIS" : "= dibiarkan"} (drive "${BRIEF_VOLIKO.drive[0].label}" TANPA URL — isi di Jadwal Konten → Catatan & brief)`);
+    console.log(`\n== Brief ${platform.nama} ==  ${tulisBrief ? "+ TULIS" : "= dibiarkan"} (drive "${BRIEF_VOLIKO.drive[0].label}" TANPA URL — isi di Jadwal Konten → Catatan & brief)`);
 
-    console.log(`\n== Jadwal November 2026 (${rencanaBaris.length} baris; baris lain bulan ini di DB: ${lainDiBulan}) ==`);
+    console.log(`\n== Jadwal November 2026 — ${platform.nama} (${rencanaBaris.length} baris; baris platform ini bulan ini di DB: ${lainDiBulan}) ==`);
     console.log("  NO  TANGGAL                       KLASIFIKASI KONSEP         CODE    NAMA PKL              STATUS      AKSI");
     let no = 0;
     let mingguLalu = "";
@@ -244,7 +252,7 @@ async function utama() {
         MagangKontenStatus: statusAda,
         MagangKontenGrup: grupAda,
         MagangKonten: await db.magangKonten.findMany({ orderBy: { id: "asc" } }),
-        Setting_brief: briefAda,
+        MagangKontenPlatform: await db.magangKontenPlatform.findMany({ orderBy: { id: "asc" } }),
       };
       for (const [nama, data] of Object.entries(isi)) {
         const berkas = join(opsi.cadangan, `${nama}.json`);
@@ -271,7 +279,7 @@ async function utama() {
           if (!ada) await tx.magangKontenGrup.create({ data: { nama: g.nama, warna: g.warna, urutan: g.urutan, aktif: true, anggota: { create: anggota.map((pesertaId) => ({ pesertaId })) } } });
           else await tx.magangKontenGrupAnggota.createMany({ data: anggota.map((pesertaId) => ({ grupId: ada.id, pesertaId })), skipDuplicates: true });
         }
-        if (tulisBrief) await tx.setting.upsert({ where: { key: KUNCI_BRIEF }, update: { value: briefJson }, create: { key: KUNCI_BRIEF, value: briefJson } });
+        if (tulisBrief) await tx.magangKontenPlatform.updateMany({ where: { id: platform.id, brief: { equals: Prisma.DbNull } }, data: { brief: briefData } });
 
         const [konsep, grup, belumTake] = await Promise.all([
           tx.magangKontenKonsep.findMany({ select: { id: true, kunci: true } }),
@@ -286,11 +294,11 @@ async function utama() {
           const pesertaId = b.kode != null ? kodeKePeserta.get(b.kode)! : null;
           const grupId = b.grup != null ? idGrup.get(b.grup)! : null;
           const tanggal = atMidnight(b.tanggal);
-          const ada = await tx.magangKonten.findFirst({ where: { tanggal, konsepId, ...(pesertaId != null ? { pesertaId } : { grupId }) }, select: { id: true } });
+          const ada = await tx.magangKonten.findFirst({ where: { platformId: platform.id, tanggal, konsepId, ...(pesertaId != null ? { pesertaId } : { grupId }) }, select: { id: true } });
           if (ada) continue;
-          const terakhir = await tx.magangKonten.findFirst({ where: { tanggal }, orderBy: { urutan: "desc" }, select: { urutan: true } });
+          const terakhir = await tx.magangKonten.findFirst({ where: { platformId: platform.id, tanggal }, orderBy: { urutan: "desc" }, select: { urutan: true } });
           await tx.magangKonten.create({
-            data: { tanggal, konsepId, pesertaId, grupId, statusId: belumTake.id, usulan: b.usulan, urutan: terakhir ? terakhir.urutan + 1 : 0 },
+            data: { platformId: platform.id, tanggal, konsepId, pesertaId, grupId, statusId: belumTake.id, usulan: b.usulan, urutan: terakhir ? terakhir.urutan + 1 : 0 },
           });
           dibuat++;
         }

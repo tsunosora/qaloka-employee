@@ -10,6 +10,9 @@
  */
 
 export const MIGRASI_KONTEN = "20261112000000_magang_jadwal_konten";
+/** Multi-platform (13 Nov 2026): semua baris & brief sheet ini milik platform "Voliko Print". */
+export const MIGRASI_PLATFORM = "20261113000000_magang_konten_platform";
+export const KUNCI_PLATFORM_VOLIKO = "voliko-print";
 
 /** kode = kolom CODE di sheet; pesertaId = MagangPeserta.id di DB Voliko; panggilan = Employee.nickname (dicek). */
 export const ANAK_VOLIKO = [

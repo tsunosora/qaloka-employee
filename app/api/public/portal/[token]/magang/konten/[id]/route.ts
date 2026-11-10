@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { json, badRequest, route } from "@/lib/http";
 import { requirePortalOwner } from "@/lib/services/portal/auth";
 import { cekUbahAnak, tanpaUndefined } from "@/lib/services/magang/konten";
-import { muatKonsep, muatStatus, pesertaKonten, serialisasiBarisAnak, whereMilikAnak } from "@/lib/services/magang/konten-db";
+import { muatKonsep, muatPlatformAnak, muatStatus, pesertaKonten, serialisasiBarisAnak, whereMilikAnak } from "@/lib/services/magang/konten-db";
 import { ubahKontenAnakSchema } from "@/lib/validators/magang-konten";
 
 type Ctx = { params: Promise<{ token: string; id: string }> };
@@ -37,6 +37,11 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   });
   if (r.count === 0) return NextResponse.json({ message: "Konten ini baru saja diubah pembina. Muat ulang lalu coba lagi." }, { status: 409 });
 
-  const [b, konsep, status] = await Promise.all([prisma.magangKonten.findUniqueOrThrow({ where: { id } }), muatKonsep(prisma), muatStatus(prisma)]);
-  return json(serialisasiBarisAnak(b, new Map(konsep.map((k) => [k.id, k])), new Map(status.map((s) => [s.id, s])), new Map(p.grup.map((g) => [g.id, g.nama]))));
+  const [b, konsep, status, platform] = await Promise.all([
+    prisma.magangKonten.findUniqueOrThrow({ where: { id } }),
+    muatKonsep(prisma),
+    muatStatus(prisma),
+    muatPlatformAnak(prisma, [lama.platformId]),
+  ]);
+  return json(serialisasiBarisAnak(b, new Map(konsep.map((k) => [k.id, k])), new Map(status.map((s) => [s.id, s])), new Map(p.grup.map((g) => [g.id, g.nama])), platform));
 });

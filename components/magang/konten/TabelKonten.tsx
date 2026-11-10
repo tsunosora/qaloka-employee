@@ -5,24 +5,74 @@ import { createPortal } from "react-dom";
 import { IconCheck, IconChevronDown, IconPencil, IconPlus, IconTrash } from "@/components/ui/icons";
 import { hexWarna, namaTanggal, susunPekan, tautanSah, warnaSelKode } from "@/lib/services/magang/konten";
 import { ChipTautan } from "@/components/magang/konten/PanelBrief";
+import { ChipPlatform } from "@/components/magang/konten/IkonPlatform";
 import { FOKUS, latarWarna, titikWarna, type BarisJson, type DataKonten } from "@/components/magang/konten/tipe";
 
-export type PatchBaris = Partial<Pick<BarisJson, "konsepId" | "pesertaId" | "grupId" | "statusId" | "judul" | "ref" | "caption" | "linkFootage" | "linkEkspor" | "usulan">>;
+export type PatchBaris = Partial<Pick<BarisJson, "platformId" | "konsepId" | "pesertaId" | "grupId" | "statusId" | "judul" | "ref" | "caption" | "linkFootage" | "linkEkspor" | "catatan" | "usulan">>;
 export type Saringan = { anak: number | null; grup: number | null; status: number | null };
 
-type Opsi = { nilai: string; label: string; warna?: string | null; keterangan?: string; nonaktif?: boolean };
+export type Opsi = { nilai: string; label: string; warna?: string | null; keterangan?: string; nonaktif?: boolean };
 
-const latarHex = (hex: string | null, persen = 42): CSSProperties | undefined => (hex ? { background: `color-mix(in oklab, ${hex} ${persen}%, transparent)` } : undefined);
+export const latarHex = (hex: string | null, persen = 42): CSSProperties | undefined => (hex ? { background: `color-mix(in oklab, ${hex} ${persen}%, transparent)` } : undefined);
 const LEBAR = [44, 162, 170, 150, 96, 176, 76, 110, 180, 124, 124, 104];
+/** Kolom PLATFORM (hanya di tampilan "Semua platform") disisipkan sesudah TANGGAL. */
+const LEBAR_PLATFORM = 184;
 /** Kolom NO & TANGGAL tetap terlihat saat tabel digulir ke samping. */
 const LEKAT_NO = "sticky left-0 z-[1]";
 const LEKAT_TGL = "sticky left-[44px] z-[1] shadow-[1px_0_0_var(--border)]";
 const LATAR_LEKAT: CSSProperties = { background: "var(--solid)" };
 const KOLOM = ["NO", "TANGGAL", "JUDUL POSTINGAN", "KLASIFIKASI KONSEP", "REF", "STATUS", "CODE", "NAMA PKL", "CAPTION", "LINK FOLDER FOOTAGE", "LINK EKSPOR KONTEN", "AKSI"];
 
+/** Opsi pilihan konsep/status/CODE/platform untuk satu bulan (dipakai tabel & kartu HP). */
+export function opsiKonten(data: DataKonten) {
+  const anak = new Map(data.anak.map((a) => [a.pesertaId, a]));
+  const konsep: Opsi[] = data.konsep.filter((k) => k.aktif).map((k) => ({ nilai: String(k.id), label: k.label, warna: k.warna }));
+  const status: Opsi[] = data.status
+    .filter((s) => s.aktif)
+    .map((s) => ({ nilai: String(s.id), label: s.nama, warna: s.warna, keterangan: s.final ? "Final — dihitung selesai" : s.anakBoleh ? "Anak boleh memilih" : "Hanya pembina" }));
+  const kode: Opsi[] = [
+    { nilai: "", label: "— belum dibagi —" },
+    ...data.anak.filter((a) => a.aktif && a.kode != null).map((a) => ({ nilai: `p:${a.pesertaId}`, label: `${a.kode} · ${a.panggilan}` })),
+    ...data.anak.filter((a) => a.aktif && a.kode == null).map((a) => ({ nilai: `p:${a.pesertaId}`, label: `– · ${a.panggilan}`, keterangan: "Belum punya kode" })),
+    ...data.grup
+      .filter((g) => g.aktif)
+      .map((g) => ({ nilai: `g:${g.id}`, label: g.nama, warna: g.warna, keterangan: g.anggota.map((p) => anak.get(p)?.panggilan).filter(Boolean).join(", ") || "Belum ada anggota" })),
+  ];
+  const platform: Opsi[] = data.platform.filter((p) => p.aktif).map((p) => ({ nilai: String(p.id), label: p.nama, warna: p.warna }));
+  return { konsep, status, kode, platform };
+}
+
+/** Tambahkan nilai saat ini (nonaktif/arsip) ke daftar opsi supaya tetap terbaca. */
+export function denganNilai(opsi: Opsi[], nilai: string, cadangan: Omit<Opsi, "nilai" | "nonaktif">): Opsi[] {
+  return opsi.some((o) => o.nilai === nilai) ? opsi : [...opsi, { nilai, ...cadangan, keterangan: cadangan.keterangan ?? "Nonaktif", nonaktif: true }];
+}
+
+/** Patch CODE dari nilai pilihan ("p:<id>" / "g:<id>" / ""). */
+export const patchKode = (v: string): PatchBaris =>
+  v.startsWith("g:") ? { grupId: Number(v.slice(2)), pesertaId: null } : v.startsWith("p:") ? { pesertaId: Number(v.slice(2)), grupId: null } : { pesertaId: null, grupId: null };
+
 // ── Pilihan (listbox buatan sendiri — dropdown bawaan peramban tidak bisa diberi warna & tidak terpotret) ──
 
-function Pilihan({ label, nilai, opsi, onPilih, children, style, idAwal }: { label: string; nilai: string; opsi: Opsi[]; onPilih: (v: string) => void; children: ReactNode; style?: CSSProperties; idAwal?: string }) {
+export function Pilihan({
+  label,
+  nilai,
+  opsi,
+  onPilih,
+  children,
+  style,
+  idAwal,
+  besar = false,
+}: {
+  label: string;
+  nilai: string;
+  opsi: Opsi[];
+  onPilih: (v: string) => void;
+  children: ReactNode;
+  style?: CSSProperties;
+  idAwal?: string;
+  /** Sasaran sentuh ≥44 px (kartu HP). */
+  besar?: boolean;
+}) {
   const id = useId();
   const tombol = useRef<HTMLButtonElement>(null);
   const daftar = useRef<HTMLUListElement>(null);
@@ -123,7 +173,7 @@ function Pilihan({ label, nilai, opsi, onPilih, children, style, idAwal }: { lab
         aria-label={label}
         onClick={() => (buka ? setBuka(false) : bukaDaftar())}
         onKeyDown={tombolKey}
-        className={`flex h-full min-h-10 w-full items-center gap-1 px-2 py-1.5 text-left hover:bg-surface-2/60 ${FOKUS} focus-visible:-outline-offset-2`}
+        className={`flex h-full ${besar ? "min-h-11 rounded-xl px-3" : "min-h-10 px-2"} w-full items-center gap-1 py-1.5 text-left hover:bg-surface-2/60 ${FOKUS} focus-visible:-outline-offset-2`}
         style={style}
       >
         <span className="min-w-0 flex-1">{children}</span>
@@ -151,7 +201,7 @@ function Pilihan({ label, nilai, opsi, onPilih, children, style, idAwal }: { lab
                 aria-disabled={o.nonaktif || undefined}
                 onMouseEnter={() => !o.nonaktif && setAktif(i)}
                 onClick={() => pilih(i)}
-                className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 ${i === aktif ? "bg-primary/15" : ""} ${o.nonaktif ? "cursor-default opacity-50" : ""}`}
+                className={`flex ${besar ? "min-h-11" : "min-h-10"} cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 ${i === aktif ? "bg-primary/15" : ""} ${o.nonaktif ? "cursor-default opacity-50" : ""}`}
               >
                 {o.warna !== undefined && <span className="h-3 w-3 shrink-0 rounded-full" style={titikWarna(o.warna)} aria-hidden="true" />}
                 <span className="min-w-0 flex-1">
@@ -170,7 +220,24 @@ function Pilihan({ label, nilai, opsi, onPilih, children, style, idAwal }: { lab
 
 // ── Sel teks / tautan ─────────────────────────────────────────────────────────────────────────
 
-function SelTeks({ label, nilai, onSimpan, panjang = false, maks, kosong }: { label: string; nilai: string | null; onSimpan: (v: string | null) => void; panjang?: boolean; maks: number; kosong: string }) {
+export function SelTeks({
+  label,
+  nilai,
+  onSimpan,
+  panjang = false,
+  maks,
+  kosong,
+  besar = false,
+}: {
+  label: string;
+  nilai: string | null;
+  onSimpan: (v: string | null) => void;
+  panjang?: boolean;
+  maks: number;
+  kosong: string;
+  /** Kartu HP: isian lebih besar (teks 16 px supaya iOS tidak memperbesar, sasaran ≥44 px). */
+  besar?: boolean;
+}) {
   const [ubah, setUbah] = useState(false);
   const [isi, setIsi] = useState("");
   const batal = useRef(false);
@@ -194,7 +261,7 @@ function SelTeks({ label, nilai, onSimpan, panjang = false, maks, kosong }: { la
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setIsi(e.target.value),
       onBlur: selesai,
     };
-    const kelas = "input w-full rounded-md px-2 py-1 text-xs";
+    const kelas = besar ? "input w-full rounded-xl px-3 py-2 text-base" : "input w-full rounded-md px-2 py-1 text-xs";
     return panjang ? (
       <div className="p-1">
         <textarea
@@ -208,13 +275,13 @@ function SelTeks({ label, nilai, onSimpan, panjang = false, maks, kosong }: { la
             } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) (e.target as HTMLElement).blur();
           }}
         />
-        <p className="mt-0.5 text-[10px] text-muted">Ctrl+Enter simpan · Esc batal</p>
+        <p className={`mt-0.5 ${besar ? "text-xs" : "text-[10px]"} text-muted`}>{besar ? "Ketuk di luar kotak untuk menyimpan" : "Ctrl+Enter simpan · Esc batal"}</p>
       </div>
     ) : (
       <div className="p-1">
         <input
           {...umum}
-          className={`${kelas} h-8`}
+          className={`${kelas} ${besar ? "h-11" : "h-8"}`}
           onKeyDown={(e) => {
             if (e.key === "Escape") batal.current = true;
             if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLElement).blur();
@@ -224,13 +291,18 @@ function SelTeks({ label, nilai, onSimpan, panjang = false, maks, kosong }: { la
     );
   }
   return (
-    <button type="button" onClick={mulai} aria-label={`${label}: ${nilai || "kosong"}. Ubah`} className={`block h-full min-h-10 w-full px-2 py-1.5 text-left hover:bg-surface-2/60 ${FOKUS} focus-visible:-outline-offset-2`}>
+    <button
+      type="button"
+      onClick={mulai}
+      aria-label={`${label}: ${nilai || "kosong"}. Ubah`}
+      className={`block h-full ${besar ? "min-h-11 rounded-xl px-3 py-2 text-sm" : "min-h-10 px-2 py-1.5"} w-full text-left hover:bg-surface-2/60 ${FOKUS} focus-visible:-outline-offset-2`}
+    >
       {nilai ? <span className={`block text-fg ${panjang ? "line-clamp-3 whitespace-pre-wrap" : ""}`}>{nilai}</span> : <span className="text-subtle">{kosong}</span>}
     </button>
   );
 }
 
-function SelTautan({ label, nilai, onSimpan }: { label: string; nilai: string | null; onSimpan: (v: string | null) => void }) {
+export function SelTautan({ label, nilai, onSimpan, besar = false }: { label: string; nilai: string | null; onSimpan: (v: string | null) => void; besar?: boolean }) {
   const [ubah, setUbah] = useState(false);
   const [isi, setIsi] = useState("");
   const [salah, setSalah] = useState(false);
@@ -273,7 +345,7 @@ function SelTautan({ label, nilai, onSimpan }: { label: string; nilai: string | 
               setUbah(false);
             } else if (e.key === "Enter") selesai();
           }}
-          className={`input h-8 w-full rounded-md px-2 py-1 text-xs ${salah ? "border-danger" : ""}`}
+          className={`input ${besar ? "h-11 rounded-xl px-3 text-base" : "h-8 rounded-md px-2 py-1 text-xs"} w-full ${salah ? "border-danger" : ""}`}
         />
         {salah && (
           <p id={idGalat} className="mt-0.5 text-[11px] font-medium text-danger">
@@ -283,9 +355,15 @@ function SelTautan({ label, nilai, onSimpan }: { label: string; nilai: string | 
       </div>
     );
   return (
-    <div className="flex min-h-10 items-center gap-1 px-1.5 py-1">
-      {nilai ? <ChipTautan t={{ label: "", url: nilai }} kecil /> : <span className="px-1 text-subtle">–</span>}
-      <button type="button" onClick={mulai} aria-label={`${nilai ? "Ubah" : "Isi"} ${label}`} title={`${nilai ? "Ubah" : "Isi"} tautan`} className={`ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg ${FOKUS}`}>
+    <div className={`flex ${besar ? "min-h-11" : "min-h-10"} min-w-0 items-center gap-1 px-1.5 py-1`}>
+      {nilai ? <ChipTautan t={{ label: "", url: nilai }} kecil={!besar} /> : <span className={`px-1 text-subtle ${besar ? "text-sm" : ""}`}>{besar ? "Belum diisi" : "–"}</span>}
+      <button
+        type="button"
+        onClick={mulai}
+        aria-label={`${nilai ? "Ubah" : "Isi"} ${label}`}
+        title={`${nilai ? "Ubah" : "Isi"} tautan`}
+        className={`ml-auto grid ${besar ? "h-11 w-11" : "h-8 w-8"} shrink-0 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg ${FOKUS}`}
+      >
         {nilai ? <IconPencil className="text-[13px]" aria-hidden="true" /> : <IconPlus className="text-[13px]" aria-hidden="true" />}
       </button>
     </div>
@@ -308,9 +386,14 @@ export function TabelKonten({
   data: DataKonten;
   saring: Saringan;
   onUbah: (b: BarisJson, patch: PatchBaris) => void;
-  onTambah: (tanggal: string) => void;
+  /** null di tampilan "Semua platform" (baris baru harus punya platform → pilih platform dulu). */
+  onTambah: ((tanggal: string) => void) | null;
   onHapus: (b: BarisJson) => void;
 }) {
+  const semua = data.platformId == null;
+  const kolom = semua ? [...KOLOM.slice(0, 2), "PLATFORM", ...KOLOM.slice(2)] : KOLOM;
+  const lebar = semua ? [...LEBAR.slice(0, 2), LEBAR_PLATFORM, ...LEBAR.slice(2)] : LEBAR;
+  const platform = new Map(data.platform.map((p) => [p.id, p]));
   const konsep = new Map(data.konsep.map((k) => [k.id, k]));
   const status = new Map(data.status.map((s) => [s.id, s]));
   const grup = new Map(data.grup.map((g) => [g.id, g]));
@@ -323,14 +406,7 @@ export function TabelKonten({
     (saring.status == null || b.statusId === saring.status);
   const item = susunPekan(data.bulan, data.baris.filter(lolos), libur);
 
-  const opsiKonsep: Opsi[] = data.konsep.filter((k) => k.aktif).map((k) => ({ nilai: String(k.id), label: k.label, warna: k.warna }));
-  const opsiStatus: Opsi[] = data.status.filter((s) => s.aktif).map((s) => ({ nilai: String(s.id), label: s.nama, warna: s.warna, keterangan: s.final ? "Final — dihitung selesai" : s.anakBoleh ? "Anak boleh memilih" : "Hanya pembina" }));
-  const opsiKode: Opsi[] = [
-    { nilai: "", label: "— belum dibagi —" },
-    ...data.anak.filter((a) => a.aktif && a.kode != null).map((a) => ({ nilai: `p:${a.pesertaId}`, label: `${a.kode} · ${a.panggilan}` })),
-    ...data.anak.filter((a) => a.aktif && a.kode == null).map((a) => ({ nilai: `p:${a.pesertaId}`, label: `– · ${a.panggilan}`, keterangan: "Belum punya kode" })),
-    ...data.grup.filter((g) => g.aktif).map((g) => ({ nilai: `g:${g.id}`, label: g.nama, warna: g.warna, keterangan: g.anggota.map((p) => anak.get(p)?.panggilan).filter(Boolean).join(", ") || "Belum ada anggota" })),
-  ];
+  const { konsep: opsiKonsep, status: opsiStatus, kode: opsiKode, platform: opsiPlatform } = opsiKonten(data);
 
   let no = 0;
   const baris: ReactNode[] = [];
@@ -339,7 +415,7 @@ export function TabelKonten({
       if (!adaSaringan || it.baris.length)
         baris.push(
           <tr key={`m-${it.tanggal}`}>
-            <td colSpan={KOLOM.length} className="border-y border-border px-3 py-1 text-xs font-semibold text-fg" style={latarHex(WARNA_KUNING, 55)}>
+            <td colSpan={kolom.length} className="border-y border-border px-3 py-1 text-xs font-semibold text-fg" style={latarHex(WARNA_KUNING, 55)}>
               <span className="sticky left-3">{namaTanggal(it.tanggal)}</span>
             </td>
           </tr>
@@ -352,13 +428,15 @@ export function TabelKonten({
           <td className={`${LEKAT_TGL} whitespace-nowrap px-2 py-1.5 text-muted`} style={LATAR_LEKAT}>
             {namaTanggal(it.tanggal)}
           </td>
-          <td colSpan={KOLOM.length - 3} className="px-2 py-1.5 text-xs text-muted">
+          <td colSpan={kolom.length - 3} className="px-2 py-1.5 text-xs text-muted">
             {it.libur ? <span className="font-semibold text-danger">Libur: {it.libur}</span> : "Belum ada jadwal."}
           </td>
           <td className="px-1 py-1">
-            <button type="button" onClick={() => onTambah(it.tanggal)} aria-label={`Tambah baris ${namaTanggal(it.tanggal)}`} title="Tambah baris" className={`grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg ${FOKUS}`}>
-              <IconPlus className="text-[14px]" aria-hidden="true" />
-            </button>
+            {onTambah && (
+              <button type="button" onClick={() => onTambah(it.tanggal)} aria-label={`Tambah baris ${namaTanggal(it.tanggal)}`} title="Tambah baris" className={`grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg ${FOKUS}`}>
+                <IconPlus className="text-[14px]" aria-hidden="true" />
+              </button>
+            )}
           </td>
         </tr>
       );
@@ -374,9 +452,10 @@ export function TabelKonten({
       const nama = g ? g.anggota.map((p) => anak.get(p)?.panggilan).filter(Boolean).join(", ") : (a?.panggilan ?? "");
       const tgl = namaTanggal(b.tanggal);
       const nilaiKode = b.grupId != null ? `g:${b.grupId}` : b.pesertaId != null ? `p:${b.pesertaId}` : "";
-      const opsiK = opsiKode.some((o) => o.nilai === nilaiKode) ? opsiKode : [...opsiKode, { nilai: nilaiKode, label: kode || "?", keterangan: "Nonaktif", nonaktif: true }];
-      const opsiS = opsiStatus.some((o) => o.nilai === String(b.statusId)) ? opsiStatus : [...opsiStatus, { nilai: String(b.statusId), label: s?.nama ?? "?", warna: s?.warna, nonaktif: true }];
-      const opsiKn = opsiKonsep.some((o) => o.nilai === String(b.konsepId)) ? opsiKonsep : [...opsiKonsep, { nilai: String(b.konsepId), label: k?.label ?? "?", warna: k?.warna, nonaktif: true }];
+      const opsiK = denganNilai(opsiKode, nilaiKode, { label: kode || "?" });
+      const opsiS = denganNilai(opsiStatus, String(b.statusId), { label: s?.nama ?? "?", warna: s?.warna });
+      const opsiKn = denganNilai(opsiKonsep, String(b.konsepId), { label: k?.label ?? "?", warna: k?.warna });
+      const pf = platform.get(b.platformId);
       baris.push(
         <tr key={b.id} className={`border-b border-border align-top ${s?.final ? "bg-success/5" : ""}`}>
           <td className={`${LEKAT_NO} px-2 py-1.5 text-center tabular text-muted`} style={LATAR_LEKAT}>
@@ -390,6 +469,18 @@ export function TabelKonten({
               </span>
             )}
           </td>
+          {semua && (
+            <td className="p-0">
+              <Pilihan
+                label={`Platform ${tgl}`}
+                nilai={String(b.platformId)}
+                opsi={denganNilai(opsiPlatform, String(b.platformId), { label: pf?.nama ?? "?", warna: pf?.warna, keterangan: "Diarsipkan" })}
+                onPilih={(v) => onUbah(b, { platformId: Number(v) })}
+              >
+                {pf ? <ChipPlatform p={pf} kecil /> : <span className="text-subtle">?</span>}
+              </Pilihan>
+            </td>
+          )}
           <td className="p-0">
             <SelTeks label={`Judul postingan ${tgl}`} nilai={b.judul} maks={200} kosong="–" onSimpan={(v) => onUbah(b, { judul: v })} />
           </td>
@@ -410,7 +501,7 @@ export function TabelKonten({
             </Pilihan>
           </td>
           <td className="p-0 text-center font-semibold" style={latarHex(warnaSelKode(k?.warna, g ? g.warna : null))}>
-            <Pilihan label={`Kode anak atau grup ${tgl}`} nilai={nilaiKode} opsi={opsiK} onPilih={(v) => onUbah(b, v.startsWith("g:") ? { grupId: Number(v.slice(2)), pesertaId: null } : v.startsWith("p:") ? { pesertaId: Number(v.slice(2)), grupId: null } : { pesertaId: null, grupId: null })}>
+            <Pilihan label={`Kode anak atau grup ${tgl}`} nilai={nilaiKode} opsi={opsiK} onPilih={(v) => onUbah(b, patchKode(v))}>
               <span className="block text-fg">{kode || <span className="font-normal text-subtle">–</span>}</span>
             </Pilihan>
           </td>
@@ -431,9 +522,11 @@ export function TabelKonten({
                   <IconCheck className="text-[14px]" aria-hidden="true" />
                 </button>
               )}
-              <button type="button" onClick={() => onTambah(b.tanggal)} aria-label={`Tambah baris lagi ${tgl}`} title="Tambah baris di tanggal ini" className={`grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg ${FOKUS}`}>
-                <IconPlus className="text-[14px]" aria-hidden="true" />
-              </button>
+              {onTambah && (
+                <button type="button" onClick={() => onTambah(b.tanggal)} aria-label={`Tambah baris lagi ${tgl}`} title="Tambah baris di tanggal ini" className={`grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg ${FOKUS}`}>
+                  <IconPlus className="text-[14px]" aria-hidden="true" />
+                </button>
+              )}
               <button type="button" onClick={() => onHapus(b)} aria-label={`Hapus baris ${tgl}`} title="Hapus baris" className={`grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-danger ${FOKUS}`}>
                 <IconTrash className="text-[14px]" aria-hidden="true" />
               </button>
@@ -446,16 +539,16 @@ export function TabelKonten({
 
   return (
     <div className="glass max-h-[calc(100vh-15rem)] min-h-80 overflow-auto rounded-2xl print:max-h-none print:overflow-visible">
-      <table className="w-full table-fixed border-collapse text-xs" style={{ minWidth: LEBAR.reduce((a, b) => a + b, 0) }}>
+      <table className="w-full table-fixed border-collapse text-xs" style={{ minWidth: lebar.reduce((a, b) => a + b, 0) }}>
         <caption className="sr-only">Jadwal konten {data.bulan}. Klik sel untuk mengubah.</caption>
         <colgroup>
-          {LEBAR.map((w, i) => (
+          {lebar.map((w, i) => (
             <col key={i} style={{ width: w }} />
           ))}
         </colgroup>
         <thead>
           <tr>
-            {KOLOM.map((kol, i) => (
+            {kolom.map((kol, i) => (
               <th
                 key={kol}
                 scope="col"
@@ -472,7 +565,7 @@ export function TabelKonten({
             baris
           ) : (
             <tr>
-              <td colSpan={KOLOM.length} className="px-4 py-10 text-center text-sm text-muted">
+              <td colSpan={kolom.length} className="px-4 py-10 text-center text-sm text-muted">
                 Tidak ada baris yang cocok dengan saringan.
               </td>
             </tr>
@@ -538,7 +631,7 @@ export function LegendaKonten({ data }: { data: DataKonten }) {
             ))}
           </ul>
         )}
-        {data.brief.catatan && <p className="mt-3 rounded-xl bg-surface-2 p-2.5 text-fg">{data.brief.catatan}</p>}
+        {data.brief?.catatan && <p className="mt-3 rounded-xl bg-surface-2 p-2.5 text-fg">{data.brief.catatan}</p>}
       </div>
     </section>
   );
