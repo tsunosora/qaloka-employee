@@ -333,3 +333,31 @@ LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tia
   404, `/magang/konten` → login; kartu konten: Rizki (kode 4) 5 jadwal termasuk hari ini 10 Nov, Yufita 5, Aqila 2; absensi hari ini
   (Fingerspot 12, HP 11 — scan pagi sesudah deploy semalam MASUK), jurnal, rotasi identik.
 - Catatan: peserta ke-8 **WAFIQ** (SMK N 4, dibuat 10 Nov 09.20) belum punya kode konten & grup, absen HP belum menyala.
+
+### Perbaikan sunting sebagian (fix/magang-konten-patch)
+
+- **Sebab** (live sejak `469adf6`): skema PATCH Jadwal Konten memakai `teksOpsional`/`tautanOpsional`
+  (`.nullable().optional().transform(v => … : null)`), jadi kolom yang TIDAK dikirim menjadi `null`, lalu route menulis `{...d}`.
+  Sunting satu sel, ganti status/konsep/CODE, atau *Tandai disetujui* (`{usulan:false}`) mengosongkan judul, ref, caption,
+  link footage, link ekspor, dan catatan baris itu. Kartu HP anak (`ubahKontenAnakSchema`) punya pola yang sama, tetapi
+  klien selalu mengirim ketiga kolomnya (tidak terkena); *Setujui semua usulan* memakai `updateMany({usulan:false})` (aman).
+  Masalah kedua: di zod 4 `.default()` tetap terisi di dalam `.partial()` — `ubahKonsepSchema` dari panel *Catatan & brief*
+  (`PATCH {referensi}`) mengembalikan warna konsep ke "putih" dan aktif ke true; `ubahGrupKontenSchema` tanpa `anggota`
+  akan mengisi `[]` (= semua anggota grup dihapus); `ubahStatusKontenSchema` mengembalikan warna/aktif/anakBoleh/final.
+- **Perbaikan**: `teksParsial`/`tautanParsial` (`lib/validators/magang-konten.ts`): tidak dikirim = `undefined` (tidak ditulis),
+  `null`/`""` = dikosongkan. Skema ubah konten, konten anak, konsep, status, grup ditulis ulang tanpa `.default()`. Data update
+  PATCH pembina dibangun fungsi murni `dataUbahKonten()` (`lib/services/magang/konten.ts`): hanya kunci yang dikirim; memilih
+  anak mengosongkan grup (dan sebaliknya) hanya bila salah satunya dikirim terisi; `selesaiAt` hanya disentuh bila `statusId`
+  dikirim. Route konsep/status/grup/anak menulis `tanpaUndefined(parsed.data)`. Skema buat (POST) tidak berubah.
+- **Diaudit**: konten `[id]` / konsep / status / grup → diperbaiki; portal anak `konten/[id]` → diperbaiki (klien tidak terkena);
+  `kode` (PUT daftar, anak di luar daftar tak disentuh), `brief` & `pola` (PUT dokumen utuh; `PanelBrief`/`TabPola` selalu kirim
+  dokumen lengkap) → aman; `misi/kategori/[id]` (sudah `teksUbah`), `pantau/[id]` (cek `!== undefined`) → aman; formulir penuh
+  `pos/[id]`, `peserta/[id]`, `misi/[id]`, `soal/[id]` → aman (satu-satunya pemanggil, halaman Pos/Peserta/Side quest, selalu
+  mengirim objek lengkap termasuk lokasi, guruPembimbing, kontakGuru, aktif); aksi `jurnal/[id]`, `tugas/[id]`, `misi/kiriman/[id]`,
+  `pendaftaran/[id]`, `rotasi/[id]`, `setelan`, portal bimbingan → aman (isi aksi lengkap, bukan sunting sebagian).
+- **Tes** `tests/magang-konten-patch.test.ts` (18): `{statusId}` / `{usulan:false}` tanpa kolom teks; `dataUbahKonten` menjaga
+  kolom lain untuk statusId (final & bukan), konsepId, usulan, pesertaId, grupId, satu sel; `null`/`""` mengosongkan; skema anak;
+  konsep `{referensi}`, status `{nama}`, grup `{nama}` tanpa nilai bawaan. Terhadap skema lama: 14 gagal, 4 lulus (tolak tautan /
+  anak+grup / trim tetap sama).
+- **Deploy** `tools/magang/deploy-fix-konten-patch-voliko.sh <SHA>` (ff-only dari `469adf6`, tanpa migrasi — batal bila `prisma/`
+  berubah; potret JSON kolom teks MagangKonten sebelum & sesudah, exit 2 bila ada kolom berisi yang menjadi kosong).

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
 import { hapusMaster, muatStatus } from "@/lib/services/magang/konten-db";
+import { tanpaUndefined } from "@/lib/services/magang/konten";
 import { ubahStatusKontenSchema } from "@/lib/validators/magang-konten";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -14,7 +15,7 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   const lama = await prisma.magangKontenStatus.findUnique({ where: { id }, select: { final: true } });
   if (!lama) return notFound("Status tidak ditemukan.");
   const final = parsed.data.final ?? lama.final;
-  await prisma.magangKontenStatus.update({ where: { id }, data: { ...parsed.data, ...(final ? { anakBoleh: false } : {}) } });
+  await prisma.magangKontenStatus.update({ where: { id }, data: { ...tanpaUndefined(parsed.data), ...(final ? { anakBoleh: false } : {}) } });
   return json({ status: await muatStatus(prisma) });
 });
 

@@ -361,3 +361,43 @@ export function selesaiAtBaru(final: boolean, lama: Date | null, sekarang: Date 
   if (!final) return null;
   return lama ?? sekarang;
 }
+
+// ── Sunting sebagian (PATCH) ───────────────────────────────────────────────────────────────────
+
+/** Salinan objek tanpa kunci bernilai undefined — supaya hanya kolom yang DIKIRIM yang ditulis. */
+export function tanpaUndefined<T extends Record<string, unknown>>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+export type UbahKontenMasuk = {
+  konsepId?: number;
+  pesertaId?: number | null;
+  grupId?: number | null;
+  statusId?: number;
+  judul?: string | null;
+  ref?: string | null;
+  caption?: string | null;
+  linkFootage?: string | null;
+  linkEkspor?: string | null;
+  catatan?: string | null;
+  usulan?: boolean;
+  urutan?: number;
+};
+
+/**
+ * Data update Prisma untuk PATCH pembina (tanpa tanggal & diubahOleh — diisi route). Hanya kolom yang dikirim;
+ * memilih anak mengosongkan grup dan sebaliknya (hanya bila salah satunya dikirim terisi); `status` (hasil
+ * periksaRujukan, hanya ada bila statusId dikirim) → selesaiAt.
+ */
+export function dataUbahKonten(
+  d: UbahKontenMasuk,
+  status: { final: boolean } | null,
+  selesaiAtLama: Date | null,
+  sekarang: Date = new Date()
+): Record<string, unknown> {
+  const data: Record<string, unknown> = tanpaUndefined(d);
+  if (d.pesertaId) data.grupId = null;
+  if (d.grupId) data.pesertaId = null;
+  if (status) data.selesaiAt = selesaiAtBaru(status.final, selesaiAtLama, sekarang);
+  return data;
+}

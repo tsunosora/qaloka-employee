@@ -23,6 +23,28 @@ const tautanOpsional = z
   .transform((v) => (v && v.trim() ? v.trim() : null))
   .refine((v) => v === null || tautanSah(v), "Tautan harus diawali http:// atau https://");
 
+/**
+ * Untuk PATCH (sunting sebagian): TIDAK DIKIRIM = tidak diubah (undefined, kunci tidak ikut ditulis);
+ * null / "" / spasi = dikosongkan (null); terisi = di-trim. Jangan pakai teksOpsional/tautanOpsional di skema
+ * ubah — keduanya mengubah "tidak dikirim" menjadi null dan menghapus isi kolom (bug 10 Nov 2026).
+ */
+export const teksParsial = (maks: number) =>
+  z
+    .string()
+    .max(maks)
+    .nullable()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v && v.trim() ? v.trim() : null));
+
+/** Tautan untuk PATCH: tidak dikirim = undefined; kosong → null; terisi → wajib http(s). */
+export const tautanParsial = z
+  .string()
+  .max(MAKS_TAUTAN, "Tautan terlalu panjang")
+  .nullable()
+  .optional()
+  .transform((v) => (v === undefined ? undefined : v && v.trim() ? v.trim() : null))
+  .refine((v) => v == null || tautanSah(v), "Tautan harus diawali http:// atau https://");
+
 const tautanBerlabel = z.object({
   label: z.string().trim().max(80).default(""),
   url: z
@@ -42,6 +64,15 @@ const isiBaris = {
   linkEkspor: tautanOpsional,
   catatan: teksOpsional(2000),
 };
+/** Sama dengan isiBaris, tetapi kolom yang tidak dikirim tetap undefined (tidak ditimpa). */
+const isiBarisUbah = {
+  judul: teksParsial(200),
+  ref: tautanParsial,
+  caption: teksParsial(5000),
+  linkFootage: tautanParsial,
+  linkEkspor: tautanParsial,
+  catatan: teksParsial(2000),
+};
 
 /** Pembina menambah baris. pesertaId & grupId: paling banyak satu. */
 export const kontenBaruSchema = z
@@ -56,7 +87,7 @@ export const kontenBaruSchema = z
   })
   .refine((b) => !(b.pesertaId && b.grupId), { message: "Pilih anak ATAU grup, bukan keduanya", path: ["pesertaId"] });
 
-/** Pembina mengubah sebagian kolom (sunting sel). */
+/** Pembina mengubah sebagian kolom (sunting sel). Kolom yang tidak dikirim = tidak diubah. */
 export const ubahKontenSchema = z
   .object({
     tanggal: ymd.optional(),
@@ -64,18 +95,18 @@ export const ubahKontenSchema = z
     pesertaId: id.nullable().optional(),
     grupId: id.nullable().optional(),
     statusId: id.optional(),
-    ...isiBaris,
+    ...isiBarisUbah,
     usulan: z.boolean().optional(),
     urutan: z.number().int().min(0).max(99).optional(),
   })
   .refine((b) => !(b.pesertaId && b.grupId), { message: "Pilih anak ATAU grup, bukan keduanya", path: ["pesertaId"] });
 
-/** Anak (dari HP) hanya boleh judul, dua tautan, dan status yang anakBoleh. */
+/** Anak (dari HP) hanya boleh judul, dua tautan, dan status yang anakBoleh. Tidak dikirim = tidak diubah. */
 export const ubahKontenAnakSchema = z
   .object({
-    judul: teksOpsional(200),
-    linkFootage: tautanOpsional,
-    linkEkspor: tautanOpsional,
+    judul: teksParsial(200),
+    linkFootage: tautanParsial,
+    linkEkspor: tautanParsial,
     statusId: id.optional(),
   })
   .strict();
@@ -96,7 +127,16 @@ export const konsepSchema = z.object({
   urutan: z.number().int().min(0).max(999).optional(),
   aktif: z.boolean().default(true),
 });
-export const ubahKonsepSchema = konsepSchema.partial();
+// Skema ubah ditulis tanpa .default(): di zod 4 nilai bawaan tetap terisi di dalam .partial(), jadi
+// PATCH {referensi} (panel brief) dulu mengembalikan warna ke "putih" dan aktif ke true.
+export const ubahKonsepSchema = z.object({
+  nama: konsepSchema.shape.nama.optional(),
+  sub: teksParsial(60),
+  warna: warna.optional(),
+  referensi: z.array(tautanBerlabel).max(10).optional(),
+  urutan: z.number().int().min(0).max(999).optional(),
+  aktif: z.boolean().optional(),
+});
 
 export const statusKontenSchema = z.object({
   nama: z.string().trim().min(2, "Nama status minimal 2 huruf").max(60),
@@ -106,7 +146,14 @@ export const statusKontenSchema = z.object({
   anakBoleh: z.boolean().default(false),
   final: z.boolean().default(false),
 });
-export const ubahStatusKontenSchema = statusKontenSchema.partial();
+export const ubahStatusKontenSchema = z.object({
+  nama: statusKontenSchema.shape.nama.optional(),
+  warna: warna.optional(),
+  urutan: z.number().int().min(0).max(999).optional(),
+  aktif: z.boolean().optional(),
+  anakBoleh: z.boolean().optional(),
+  final: z.boolean().optional(),
+});
 
 export const grupKontenSchema = z.object({
   nama: z.string().trim().min(1, "Nama grup wajib diisi").max(60),
@@ -115,7 +162,14 @@ export const grupKontenSchema = z.object({
   aktif: z.boolean().default(true),
   anggota: z.array(id).max(30).default([]),
 });
-export const ubahGrupKontenSchema = grupKontenSchema.partial();
+/** anggota tidak dikirim = anggota tidak diubah (dulu .partial() mengisi [] → semua anggota terhapus). */
+export const ubahGrupKontenSchema = z.object({
+  nama: grupKontenSchema.shape.nama.optional(),
+  warna: warna.optional(),
+  urutan: z.number().int().min(0).max(999).optional(),
+  aktif: z.boolean().optional(),
+  anggota: z.array(id).max(30).optional(),
+});
 
 /** Kode anak (CODE di sheet). null = tanpa kode. Kode yang sama dipakai dua anak → ditolak. */
 export const kodeAnakSchema = z

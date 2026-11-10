@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
 import { hapusMaster, muatKonsep } from "@/lib/services/magang/konten-db";
+import { tanpaUndefined } from "@/lib/services/magang/konten";
 import { ubahKonsepSchema } from "@/lib/validators/magang-konten";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -10,7 +11,7 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   const id = Number((await ctx.params).id) || 0;
   const parsed = ubahKonsepSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.flatten());
-  const r = await prisma.magangKontenKonsep.updateMany({ where: { id }, data: parsed.data });
+  const r = await prisma.magangKontenKonsep.updateMany({ where: { id }, data: tanpaUndefined(parsed.data) });
   if (r.count === 0) return notFound("Konsep tidak ditemukan.");
   return json({ konsep: await muatKonsep(prisma) });
 });

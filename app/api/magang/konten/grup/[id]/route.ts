@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
 import { hapusMaster, muatGrup } from "@/lib/services/magang/konten-db";
+import { tanpaUndefined } from "@/lib/services/magang/konten";
 import { ubahGrupKontenSchema } from "@/lib/validators/magang-konten";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -11,7 +12,8 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   const id = Number((await ctx.params).id) || 0;
   const parsed = ubahGrupKontenSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return badRequest(parsed.error.flatten());
-  const { anggota, ...d } = parsed.data;
+  const { anggota, ...sisa } = parsed.data;
+  const d = tanpaUndefined(sisa);
   if (!(await prisma.magangKontenGrup.findUnique({ where: { id }, select: { id: true } }))) return notFound("Grup tidak ditemukan.");
   if (anggota) {
     const unik = [...new Set(anggota)];

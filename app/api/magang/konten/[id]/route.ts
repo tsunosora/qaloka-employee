@@ -2,15 +2,15 @@ import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
 import { atMidnight } from "@/lib/services/leave/service";
 import { idPengguna } from "@/lib/services/reimbursement/service";
-import { selesaiAtBaru } from "@/lib/services/magang/konten";
+import { dataUbahKonten } from "@/lib/services/magang/konten";
 import { includeBaris, periksaRujukan, serialisasiBaris } from "@/lib/services/magang/konten-db";
 import { ubahKontenSchema } from "@/lib/validators/magang-konten";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /**
- * Pembina menyunting sel (sebagian kolom). Anak & grup saling meniadakan: memilih anak mengosongkan grup
- * dan sebaliknya. Status final → selesaiAt diisi; kembali ke status bukan final → dikosongkan.
+ * Pembina menyunting sel (sebagian kolom): kolom yang tidak dikirim TIDAK diubah. Anak & grup saling meniadakan:
+ * memilih anak mengosongkan grup dan sebaliknya. Status final → selesaiAt diisi; kembali ke status bukan final → dikosongkan.
  */
 export const PATCH = route<Ctx>(async (req, ctx) => {
   const session = await requireManager();
@@ -23,11 +23,9 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   const cek = await periksaRujukan(prisma, d);
   if ("galat" in cek) return badRequest({ formErrors: [cek.galat] });
 
-  const data: Record<string, unknown> = { ...d, diubahOlehId: await idPengguna(session.user?.email), diubahOlehKaryawanId: null };
+  // Hanya kolom yang dikirim yang ditulis (kolom lain baris ini tidak tersentuh).
+  const data: Record<string, unknown> = { ...dataUbahKonten(d, cek.status, lama.selesaiAt), diubahOlehId: await idPengguna(session.user?.email), diubahOlehKaryawanId: null };
   if (tanggal) data.tanggal = atMidnight(tanggal);
-  if (d.pesertaId) data.grupId = null;
-  if (d.grupId) data.pesertaId = null;
-  if (cek.status) data.selesaiAt = selesaiAtBaru(cek.status.final, lama.selesaiAt);
   const b = await prisma.magangKonten.update({ where: { id }, data, include: includeBaris });
   return json(serialisasiBaris(b));
 });

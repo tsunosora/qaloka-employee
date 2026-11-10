@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { json, badRequest, route } from "@/lib/http";
 import { requirePortalOwner } from "@/lib/services/portal/auth";
-import { cekUbahAnak } from "@/lib/services/magang/konten";
+import { cekUbahAnak, tanpaUndefined } from "@/lib/services/magang/konten";
 import { muatKonsep, muatStatus, pesertaKonten, serialisasiBarisAnak, whereMilikAnak } from "@/lib/services/magang/konten-db";
 import { ubahKontenAnakSchema } from "@/lib/validators/magang-konten";
 
@@ -33,7 +33,7 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
   // Kunci optimis: baris yang baru saja divalidasi pembina tidak boleh tertimpa.
   const r = await prisma.magangKonten.updateMany({
     where: { id, statusId: lama.statusId, status: { final: false } },
-    data: { ...parsed.data, diubahOlehKaryawanId: employee.id, diubahOlehId: null },
+    data: { ...tanpaUndefined(parsed.data), diubahOlehKaryawanId: employee.id, diubahOlehId: null },
   });
   if (r.count === 0) return NextResponse.json({ message: "Konten ini baru saja diubah pembina. Muat ulang lalu coba lagi." }, { status: 409 });
 
