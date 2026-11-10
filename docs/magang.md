@@ -375,7 +375,7 @@ LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tia
   & menyimpan Catatan & Brief.
 - Skrip pemulihan TIDAK dijalankan (tidak ada data hilang).
 
-## Jadwal konten multi-platform & responsif (feat/magang-konten-platform — BELUM dideploy)
+## Jadwal konten multi-platform & responsif (feat/magang-konten-platform — terdeploy ke Voliko 10 Nov 20.35)
 
 Satu tim magang membuat konten untuk beberapa akun/brand (Voliko Print, Exindo, Xposer, Epic Jogja, Voliko Sport). Tiap baris
 jadwal kini milik SATU **platform**; tiap platform punya jadwal, brief, dan giliran sendiri.
@@ -438,3 +438,17 @@ jadwal kini milik SATU **platform**; tiap platform punya jadwal, brief, dan gili
   HP anak & ringkasan guru (tanpa bocor), rencana skrip data idempoten.
 - **Tangkapan** (data fiktif, `.tangkapan/platform-*.png`): 1366 tab & Semua platform, Kelola platform (hapus → tawaran arsip), 768 (tabel
   bergulir, NO/TANGGAL lengket), 360 kartu / sunting judul di kartu / laci brief, HP anak berlabel platform.
+
+### Deploy Voliko 10 Nov 2026 20.34–20.35 + platform kosong (izin Faisal)
+
+- `~/web/rate-my-staff` `3d74d30` → **`5231969`** (ff-only, `setsid nohup` `~/alat/deploy-rms-konten-platform-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-203415` 61 tabel + .env + storage + jepret teks konten). Lockfile sama; build lalu migrasi
+  `20261113000000_magang_konten_platform`; restart `ratemystaff` saja; galat baru 0. Semua 24 baris → Voliko Print; tidak ada baris tanpa platform.
+- Jepretan sebelum = sesudah (`~/alat/jepret-konten-platform-20261110.sh`): konten (checksum semua kolom), warna konsep, grup 2/2/3, kode 1–7,
+  absensi/jurnal/penugasan. Brief Voliko Print = isi Setting lama (dibandingkan sebagai JSON); Setting lama dibiarkan sebagai cadangan.
+- `tools/magang/voliko-platform-konten.ts`: dry-run → `--jalankan` (cadangan `~/cadangan/magang-platform-20261110-203520/`): **Exindo, Xposer,
+  Epic Jogja, Voliko Sport** (urutan 2–5, kosong); ulang → 0 dibuat.
+- Uji parsial produksi (`~/alat/uji-patch-parsial-platform-20261110.log`): baris #1 catatan tetap saat ubah status/usulan, dikembalikan = awal;
+  konsep #1 warna tetap; platform #1 PATCH {nama} → warna/ikon/urutan/aktif tetap. API: 5 platform, Voliko Print 24 baris; `/magang/konten`
+  (login) 200 dengan sidebar baru (nav `overflow-y-auto`, `h-dvh`). /login /me /absen /pantau normal. Fingerspot terakhir 20.25 (pra-deploy),
+  webhook hidup.
