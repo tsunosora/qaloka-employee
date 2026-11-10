@@ -452,3 +452,63 @@ jadwal kini milik SATU **platform**; tiap platform punya jadwal, brief, dan gili
   konsep #1 warna tetap; platform #1 PATCH {nama} → warna/ikon/urutan/aktif tetap. API: 5 platform, Voliko Print 24 baris; `/magang/konten`
   (login) 200 dengan sidebar baru (nav `overflow-y-auto`, `h-dvh`). /login /me /absen /pantau normal. Fingerspot terakhir 20.25 (pra-deploy),
   webhook hidup.
+
+## Jadwal harian berpasangan (feat/magang-jadwal-harian — BELUM dideploy)
+
+Sengaja SEDERHANA: anak cukup tahu "hari ini KONTEN / PRODUKSI bersama siapa"; detailnya dijelaskan pembina.
+
+- **Aturan** (`lib/services/magang/harian.ts`, murni): pasangan 2 anak (atau 1 = "sendiri") mengerjakan KONTEN atau PRODUKSI,
+  **bergantian tiap hari kerja** (Senin–Sabtu; Minggu & tanggal di tabel Holiday dilewati dan TIDAK membalik giliran). Patokan =
+  tanggal + tugas pada tanggal itu; tugas hari D = tugas patokan bila selisih hari kerja patokan→D genap, selain itu tugas satunya
+  (berlaku mundur juga; `selisihHariKerja` dihitung aritmetis − libur). Hanya dalam masa magang tiap anak (mulai..selesai) dan bila
+  peserta & karyawan aktif; di luar itu tidak ada tugas. Pasangan yang anggotanya tinggal satu (rekan belum ada / nonaktif / di luar
+  masa / libur sendiri / dipinjam pasangan lain) → anak tersisa tetap bertugas, ditandai **sendiri**. Satu anak paling banyak di
+  SATU pasangan aktif (`bentrokPasangan`, dicek di POST/PATCH pada gabungan data lama + kiriman → 422).
+- **Pengecualian per tanggal** (pembina): tingkat pasangan — ganti tugas hari itu / libur (+ catatan); tingkat anak — ganti pasangan
+  hari itu (`jenis "pasangan"`, rekan pengganti + tugas opsional; berlaku DUA ARAH, rekan lama masing-masing jadi sendiri; tugas =
+  tugas pengecualian → pola pasangan si anak → pola pasangan rekan), atau libur anak itu saja. Pengecualian **tidak menggeser giliran
+  hari-hari berikutnya** (giliran selalu dihitung dari patokan; diuji). POST mengganti pengecualian lama untuk sasaran yang sama di
+  tanggal itu (untuk ganti pasangan: juga milik rekan pengganti), satu transaksi tanpa DDL; bila tetap ada dua, id terbesar menang.
+- **Model** (migrasi `20261114000000_magang_jadwal_harian`, ditulis tangan, hanya MENAMBAH 2 tabel, tanpa data): `MagangPasangan`
+  (nama ≤80 opsional, pesertaAId, pesertaBId nullable = sendiri, patokanTanggal DateTime tengah malam WIB, patokanTugas
+  'konten'|'produksi', aktif, urutan) dan `MagangHarianPengecualian` (tanggal, pasanganId? / pesertaId?, jenis 'tugas'|'libur'|'pasangan',
+  tugas?, pasanganPesertaId?, catatan ≤200, dibuatOlehId User?; indeks tanggal). Bukti: DB kosong + semua migrasi → `prisma migrate diff
+  --from-url … --to-schema-datamodel` = *No difference*.
+- **API pembina** (`requireManager`): `GET /api/magang/harian?minggu=YYYY-MM-DD` (grid Senin–Sabtu × pasangan, pasangan, pengecualian,
+  libur, anak, teks WA), `GET …/harian/teks?minggu=`, `GET/POST …/harian/pasangan`, `PATCH/DELETE …/pasangan/[id]` (PATCH sebagian
+  `.strict()` tanpa `.default()`, route menulis `tanpaUndefined`), `POST …/harian/pengecualian`, `PATCH/DELETE …/pengecualian/[id]`
+  (PATCH hanya tugas/rekan/catatan).
+- **Dasbor** Magang → **Jadwal Harian** (`/magang/harian?minggu=`): tabel tanggal × pasangan dengan lencana besar KONTEN (ungu, ikon
+  kamera) / PRODUKSI (oranye, ikon kardus) / LIBUR — selalu teks + ikon, token `--konten`/`--produksi` (gelap, terang, cetak); minggu
+  sebelumnya/berikutnya/minggu ini, hari ini disorot, tanggal merah tertulis, pensil = diubah pembina, penyimpangan per anak di bawah
+  lencana ("X: bersama Y", "sendiri", "libur"). Klik kotak → dialog: KONTEN/PRODUKSI/LIBUR hari ini + catatan, *Kembalikan ke pola*, ubah
+  satu anak (kerja bersama anak lain + tugas, atau libur sendiri), hapus perubahan anak. **Kelola pasangan**: pilih 2 anak (anak 2 boleh
+  kosong = sendiri), nama opsional, tanggal patokan + tugasnya, urutan, aktif; peringatan bila anak sudah di pasangan aktif lain; ubah =
+  hanya kolom yang berubah; hapus dua langkah (saran: hilangkan centang Aktif). **Salin untuk WA** ("Senin 16 Nov — Konten: A & B, C & D ·
+  Produksi: E & F, G & H"; tanggal merah "— Libur (nama)"; "· Libur: X"; "(sendiri)") + *Lihat teks*; **Cetak** = tabel (terang). <768 px
+  kartu per hari.
+- **HP anak** (`/me/<token>` tab Magang): kartu PALING ATAS "Hari ini · Selasa 10 Nov — KONTEN bersama <rekan>" (atau PRODUKSI, LIBUR,
+  "Hari Minggu — libur", "Tanggal merah — libur", "Di luar masa magang", "Belum ada jadwal — tanya pembina") + baris hari kerja berikutnya
+  ("Besok (Rabu 11 Nov): …", atau nama hari bila bukan besok). Tidak ada isi lain; catatan pembina TIDAK dikirim. Rute `GET
+  /api/public/portal/<token>/magang/harian` (sesi portal; mode owner `?owner=1` boleh melihat, rute ini baca saja) — hanya jadwal anak
+  sendiri: tanggal, keadaan, tugas, nama panggilan rekan, sendiri.
+- **Yang disembunyikan / dilipat dari anak** (data tetap untuk pembina): bagian terlipat **Detail lainnya** (bawaan TERTUTUP, isi baru
+  dipasang saat dibuka) berisi kartu *Pos kamu minggu ini* (pos, target, pos berikutnya), kartu *Jadwal Konten* (konten hari ini, brief,
+  daftar berikutnya/sebelumnya — tetap bisa diisi dari sana) dan kartu *Jadwal rotasi kamu*. Tetap terbuka seperti biasa: Jurnal harian,
+  Side quest, Tugas mengingat (form & info "dibuka hari …"), Nilai dari pembimbing.
+- **Pantau guru**: bagian lipat **Tugas harian** di detail anak (rentang terpilih ∩ masa magang): per tanggal KONTEN/PRODUKSI + "bersama
+  <panggilan>" / sendiri, LIBUR, TANGGAL MERAH (Minggu tidak ditampilkan). `serialHarianGuru` (tanpa catatan); tes kunci terlarang lulus.
+- **Skrip data** `tools/magang/voliko-jadwal-harian.ts` (data `tools/magang/data/voliko-pasangan.ts`: 4 pasangan, patokan Selasa 10 Nov
+  2026, dua KONTEN + dua PRODUKSI): `TZ=Asia/Jakarta npx tsx …` = DRY RUN (cek peserta, rencana, grid 10–30 Nov); `--jalankan` = cadangan
+  JSON (`~/cadangan/magang-harian-<waktu>`) lalu satu transaksi tanpa DDL. Batal bila migrasi belum ada / id peserta tidak ada / panggilan
+  tidak cocok (tanpa peduli huruf besar) / anak sudah di pasangan aktif lain. Idempoten per anggota: pasangan yang sudah ada TIDAK ditimpa
+  (beda patokan dilaporkan). Diuji di DB lokal: dry-run → jalankan (4 dibuat) → ulang = 0; DB tanpa migrasi → BATAL.
+- **Deploy** `tools/magang/deploy-jadwal-harian-voliko.sh <SHA>` (ff-only dari `5231969`, satu-satunya migrasi baru yang boleh =
+  `20261114000000_magang_jadwal_harian`, cadangan DB+.env+storage, penjaga konten tetap (potret teks exit 2, platform exit 3, hitungan per
+  platform sebelum = sesudah), build → migrasi → restart `ratemystaff` saja; tabel baru harus kosong (exit 4); curl halaman & API). Skrip
+  data pasangan = langkah terpisah sesudahnya.
+- **Tes** `tests/magang-harian.test.ts`: selisih hari kerja (vs hitung manual), bergantian lewat Minggu, libur tidak membalik, mundur dari
+  patokan, pengecualian tidak menggeser, libur pasangan/anak, ganti pasangan dua arah + rekan lama sendiri, terbaru menang, pasangan
+  sendiri, di luar masa / nonaktif, satu-pasangan-aktif, validasi (PATCH tanpa kunci tambahan), grid + teks WA, data Voliko 10–16 Nov,
+  rencana skrip idempoten, nama asli hanya di berkas data, bentuk migrasi, serializer anak/guru tanpa catatan. Tangkapan (data fiktif):
+  `.tangkapan/harian-*.png`.

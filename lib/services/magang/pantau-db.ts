@@ -17,6 +17,7 @@ import { predikat } from "./nilai";
 import { kategoriDanPeta, progresPeserta } from "./misi-db";
 import { labelKategori } from "./misi";
 import { grupAnak, whereMilikAnak } from "./konten-db";
+import { jadwalSatuAnak } from "./harian-db";
 import { daftarSekolah, kunciSekolah, sekolahSama } from "./sekolah";
 import {
   PANTAU_COOKIE,
@@ -33,6 +34,7 @@ import {
   serialIzinGuru,
   serialJurnalGuru,
   serialKontenGuru,
+  serialHarianGuru,
   serialRaporRingkas,
   serialScan,
   serialSideQuest,
@@ -366,6 +368,8 @@ export async function detailAnakGuru(t: TautanDb, p: PesertaSekolah, r: { dari: 
       .reverse(),
     // Jadwal konten (12 Nov 2026; per platform 13 Nov): hanya hitungan, tanpa tautan/judul.
     konten: await hitungKontenGuru(p.id, r),
+    // Tugas harian berpasangan (14 Nov 2026): per tanggal dalam rentang & masa magang — tugas + nama panggilan rekan.
+    harian: serialHarianGuru(await jadwalSatuAnak(prisma, p.id, r.dari > m.mulai ? r.dari : m.mulai, m.selesai && m.selesai < r.sampai ? m.selesai : r.sampai)),
     sideQuest: serialSideQuest(
       progres.get(p.id) ?? null,
       misiSelesai.map((k) => ({ judul: k.misi.judul, kategoriLabel: labelKategori(k.misi.kategori, peta), tanggal: k.diputusAt ? toYmd(k.diputusAt) : null }))

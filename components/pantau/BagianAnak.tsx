@@ -5,6 +5,7 @@ import { IconChevronDown } from "@/components/ui/icons";
 import { longDate, shortDate, soft } from "@/components/portal/ui";
 import { tglPendek, warnaNilai } from "@/components/magang/ui";
 import { GambarMini, Lightbox } from "./Lightbox";
+import { LencanaLibur, LencanaTugas } from "@/components/magang/harian/ui";
 import { STATUS_HARI, STATUS_IZIN, type AnakRingkas, type DetailAnak, type StatusHari } from "./tipe";
 
 export function Chip({ label, warna }: { label: string; warna: string }) {
@@ -175,6 +176,28 @@ export function BagianAnak({ d }: { d: DetailAnak }) {
           </div>
         )}
       </Bagian>
+
+      {d.harian && d.harian.length > 0 && (
+        <Bagian judul="Tugas harian" ringkas={`Konten ${d.harian.filter((h) => h.tugas === "konten").length} hari · Produksi ${d.harian.filter((h) => h.tugas === "produksi").length} hari`}>
+          <ul className="divide-y divide-border">
+            {[...d.harian].reverse().map((h) => (
+              <li key={h.tanggal} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                <span className="text-sm font-semibold text-fg">{shortDate(h.tanggal)}</span>
+                <span className="flex flex-wrap items-center gap-2 text-sm text-muted sm:justify-end">
+                  {h.tugas ? (
+                    <>
+                      <LencanaTugas tugas={h.tugas} ukuran="kecil" />
+                      <span>{h.rekan ? `bersama ${h.rekan}` : h.sendiri ? "sendiri" : ""}</span>
+                    </>
+                  ) : (
+                    <LencanaLibur ukuran="kecil" label={h.keadaan === "libur" ? "LIBUR" : "TANGGAL MERAH"} />
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Bagian>
+      )}
 
       <Bagian judul="Absensi" ringkas={`${d.absensi.length} hari tercatat`}>
         {d.absensi.length === 0 ? (

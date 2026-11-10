@@ -9,6 +9,7 @@ import {
   serialScan,
   serialSideQuest,
   serialTugasGuru,
+  serialHarianGuru,
 } from "@/lib/services/magang/pantau";
 
 /** Kunci terlarang yang diminta (brief): dicek tanpa peduli huruf besar. */
@@ -90,6 +91,13 @@ describe("serializer guru tidak membocorkan data", () => {
     );
     aman(sq);
     aman(serialRaporRingkas({ nilaiAkhir: 80, predikat: "Baik", tugasDikirim: 2, tugasTerlambat: 0, mingguBerjalan: 2, baris: [{ nama: "A", mulai: "2026-11-09", minggu: 2, nilai: 80, predikat: "Baik", tugasDikirim: 2, posId: 1 } as never] }));
+  });
+
+  it("tugas harian: tanpa catatan pembina / id pengecualian", () => {
+    const h = { pesertaId: 1, tanggal: "2026-11-10", keadaan: "tugas", tugas: "konten", tugasPola: "produksi", rekanId: 2, rekan: "Dua", sendiri: false, libur: false, sumber: "pengecualian", tingkat: "pasangan", pengecualianId: 7, pasanganId: 3, catatan: "internal" } as const;
+    const out = serialHarianGuru([h]);
+    aman(out);
+    expect(out).toEqual([{ tanggal: "2026-11-10", keadaan: "tugas", tugas: "konten", rekan: "Dua", sendiri: false }]);
   });
 
   it("pendeteksi kunci terlarang memang menangkap kebocoran (kontrol)", () => {

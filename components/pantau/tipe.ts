@@ -47,6 +47,8 @@ export type DetailAnak = {
   jadwal: { mulai: string; sampai: string; minggu: number; pos: string; lokasi: string | null; sekarang: boolean }[];
   tugas: { senin: string; pos: string | null; dikirim: string; terlambat: boolean; dinilai: boolean; nilai: number | null; predikat: string; catatanPembimbing: string | null }[];
   konten?: { selesai: number; terjadwal: number; perPlatform?: { platform: string; selesai: number; terjadwal: number }[] };
+  /** Tugas harian berpasangan (14 Nov 2026): hari bertugas & libur dalam rentang + masa magang. */
+  harian?: { tanggal: string; keadaan: "tugas" | "libur" | "bukan-hari-kerja" | "di-luar-masa" | "tanpa-pasangan"; tugas: "konten" | "produksi" | null; rekan: string | null; sendiri: boolean }[];
   sideQuest: {
     selesai: number;
     total: number;

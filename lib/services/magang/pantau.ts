@@ -12,6 +12,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { hariKerja, kerajinan } from "./jurnal";
 import { kunciSekolah, sekolahSama } from "./sekolah";
 import { ringkasKontenPlatform } from "./konten";
+import { hariDalamMinggu, serialHarianAnak, type HasilAnak } from "./harian";
 
 export const PANTAU_COOKIE = "rms_pantau";
 /** Umur sesi guru: 8 jam. */
@@ -449,6 +450,16 @@ export function serialSideQuest(
  */
 export function serialKontenGuru(baris: readonly { platform: { nama: string; urutan: number }; status: { final: boolean } }[]) {
   return ringkasKontenPlatform(baris.map((b) => ({ platform: b.platform.nama, urutanPlatform: b.platform.urutan, final: b.status.final })));
+}
+
+/**
+ * Tugas harian (KONTEN / PRODUKSI bergantian) untuk guru: hanya hari bertugas & hari libur (pembina / tanggal merah,
+ * bukan Minggu) dalam masa magang. Per hari: tanggal, keadaan, tugas, nama panggilan rekan, sendiri — tanpa catatan.
+ */
+export function serialHarianGuru(hasil: readonly HasilAnak[]) {
+  return hasil
+    .filter((h) => h.keadaan === "tugas" || h.keadaan === "libur" || (h.keadaan === "bukan-hari-kerja" && hariDalamMinggu(h.tanggal) !== 0))
+    .map(serialHarianAnak);
 }
 
 export function serialRaporRingkas(r: {

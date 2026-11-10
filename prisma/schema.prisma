@@ -59,21 +59,22 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  assessments         Assessment[]        @relation("Evaluator")
+  assessments         Assessment[]               @relation("Evaluator")
   auditLogs           AuditLog[]
   notifications       Notification[]
-  leaveDecisions      LeaveRequest[]      @relation("LeaveDecider")
-  redemptionDecisions PointRedemption[]   @relation("RedemptionDecider")
-  lemburDecisions     PengajuanLembur[]   @relation("LemburDecider")
-  reimburseDecisions  Reimbursement[]     @relation("ReimburseDecider")
-  absenHpDecisions    AbsenHpBukti[]      @relation("AbsenHpDecider")
-  absenTimDecisions   AbsenTimBaris[]     @relation("AbsenTimDecider")
-  rekapDecisions      RekapHarian[]       @relation("RekapDecider")
-  magangDinilai       MagangTugas[]       @relation("MagangPenilai")
-  magangJurnalDicek   MagangJurnal[]      @relation("MagangJurnalCek")
-  magangMisiDiputus   MagangMisiKiriman[] @relation("MagangMisiPutus")
-  magangPantauDibuat  MagangPantau[]      @relation("MagangPantauDibuat")
-  magangKontenDiubah  MagangKonten[]      @relation("MagangKontenDiubah")
+  leaveDecisions      LeaveRequest[]             @relation("LeaveDecider")
+  redemptionDecisions PointRedemption[]          @relation("RedemptionDecider")
+  lemburDecisions     PengajuanLembur[]          @relation("LemburDecider")
+  reimburseDecisions  Reimbursement[]            @relation("ReimburseDecider")
+  absenHpDecisions    AbsenHpBukti[]             @relation("AbsenHpDecider")
+  absenTimDecisions   AbsenTimBaris[]            @relation("AbsenTimDecider")
+  rekapDecisions      RekapHarian[]              @relation("RekapDecider")
+  magangDinilai       MagangTugas[]              @relation("MagangPenilai")
+  magangJurnalDicek   MagangJurnal[]             @relation("MagangJurnalCek")
+  magangMisiDiputus   MagangMisiKiriman[]        @relation("MagangMisiPutus")
+  magangPantauDibuat  MagangPantau[]             @relation("MagangPantauDibuat")
+  magangKontenDiubah  MagangKonten[]             @relation("MagangKontenDiubah")
+  magangHarianDibuat  MagangHarianPengecualian[] @relation("MagangHarianDibuat")
 }
 
 model Department {
@@ -488,8 +489,8 @@ model LeaveRequest {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  decidedBy User?    @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  employee  Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  decidedBy User?           @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
   lampiran  LeaveLampiran[]
 
   @@index([employeeId])
@@ -1076,13 +1077,17 @@ model MagangPeserta {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  employee   Employee                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  penugasan  MagangPenugasan[]
-  tugas      MagangTugas[]
-  jurnal     MagangJurnal[]
-  misi       MagangMisiKiriman[]
-  konten     MagangKonten[]
-  kontenGrup MagangKontenGrupAnggota[]
+  employee    Employee                   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  penugasan   MagangPenugasan[]
+  tugas       MagangTugas[]
+  jurnal      MagangJurnal[]
+  misi        MagangMisiKiriman[]
+  konten      MagangKonten[]
+  kontenGrup  MagangKontenGrupAnggota[]
+  pasanganA   MagangPasangan[]           @relation("MagangPasanganA")
+  pasanganB   MagangPasangan[]           @relation("MagangPasanganB")
+  harianAnak  MagangHarianPengecualian[] @relation("MagangHarianAnak")
+  harianRekan MagangHarianPengecualian[] @relation("MagangHarianRekan")
 
   @@index([sekolah])
 }
@@ -1446,4 +1451,55 @@ model MagangKonten {
   @@index([statusId])
   @@index([diubahOlehId])
   @@index([diubahOlehKaryawanId])
+}
+
+// Jadwal harian berpasangan (14 Nov 2026): pasangan 2 anak bergantian KONTEN / PRODUKSI tiap hari kerja (Senin–Sabtu,
+// Minggu & Holiday dilewati tanpa membalik giliran). patokanTugas = tugas pada patokanTanggal. pesertaBId null = sendiri.
+// Satu anak paling banyak di SATU pasangan aktif (dijaga di service, lib/services/magang/harian.ts bentrokPasangan).
+model MagangPasangan {
+  id             Int      @id @default(autoincrement())
+  nama           String?  @db.VarChar(80)
+  pesertaAId     Int
+  pesertaBId     Int?
+  patokanTanggal DateTime
+  patokanTugas   String   @db.VarChar(10)
+  aktif          Boolean  @default(true)
+  urutan         Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pesertaA     MagangPeserta              @relation("MagangPasanganA", fields: [pesertaAId], references: [id], onDelete: Cascade)
+  pesertaB     MagangPeserta?             @relation("MagangPasanganB", fields: [pesertaBId], references: [id], onDelete: SetNull)
+  pengecualian MagangHarianPengecualian[]
+
+  @@index([pesertaAId])
+  @@index([pesertaBId])
+}
+
+// Pengecualian per tanggal dari pembina. Tingkat pasangan (pasanganId): jenis "tugas" (ganti tugas hari itu) / "libur".
+// Tingkat anak (pesertaId): "pasangan" (bekerja dengan pasanganPesertaId hari itu, tugas opsional), "tugas", "libur".
+// Pengecualian TIDAK menggeser giliran hari-hari berikutnya.
+model MagangHarianPengecualian {
+  id                Int      @id @default(autoincrement())
+  tanggal           DateTime
+  pasanganId        Int?
+  pesertaId         Int?
+  jenis             String   @db.VarChar(20)
+  tugas             String?  @db.VarChar(10)
+  pasanganPesertaId Int?
+  catatan           String?  @db.VarChar(200)
+  dibuatOlehId      Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  pasangan        MagangPasangan? @relation(fields: [pasanganId], references: [id], onDelete: Cascade)
+  peserta         MagangPeserta?  @relation("MagangHarianAnak", fields: [pesertaId], references: [id], onDelete: Cascade)
+  pasanganPeserta MagangPeserta?  @relation("MagangHarianRekan", fields: [pasanganPesertaId], references: [id], onDelete: Cascade)
+  dibuatOleh      User?           @relation("MagangHarianDibuat", fields: [dibuatOlehId], references: [id], onDelete: SetNull)
+
+  @@index([tanggal])
+  @@index([pasanganId])
+  @@index([pesertaId])
+  @@index([pasanganPesertaId])
+  @@index([dibuatOlehId])
 }
