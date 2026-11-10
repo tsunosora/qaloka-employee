@@ -6,6 +6,7 @@ import { api } from "@/lib/fetcher";
 import { IconAlert, IconCheck, IconCopy, IconDownload, IconLink } from "@/components/ui/icons";
 import { soft } from "@/components/portal/ui";
 import { tglPendek } from "@/components/magang/ui";
+import { JamKerjaSekolah, type JamSekolahData } from "@/components/magang/JamKerjaSekolah";
 
 export type TautanAdmin = {
   id: number;
@@ -62,7 +63,16 @@ function KolomPin({ id, nilai, onChange, label = "PIN untuk guru" }: { id: strin
 }
 
 /** Satu kartu sekolah di Magang → Sekolah: ringkasan anak + panel tautan pantauan guru. */
-export function KartuSekolah({ s, onBerubah }: { s: SekolahAdmin; onBerubah: () => void }) {
+export function KartuSekolah({
+  s,
+  onBerubah,
+  jamKerja,
+}: {
+  s: SekolahAdmin;
+  onBerubah: () => void;
+  /** Jam kerja anak magang sekolah ini (GET /api/magang/jam); undefined = bagian tidak ditampilkan. */
+  jamKerja?: { jam: JamSekolahData; toleransiUmum: number; jamToko: { masuk: string; pulang: string } };
+}) {
   const t = s.tautan;
   const [buka, setBuka] = useState<"buat" | "pin" | null>(null);
   const [pin, setPin] = useState("");
@@ -137,6 +147,17 @@ export function KartuSekolah({ s, onBerubah }: { s: SekolahAdmin; onBerubah: () 
           <IconDownload /> Cetak rapor sekolah
         </Link>
       </div>
+
+      {jamKerja && (
+        <JamKerjaSekolah
+          kunci={s.kunci}
+          label={s.label}
+          jam={jamKerja.jam}
+          toleransiUmum={jamKerja.toleransiUmum}
+          jamToko={jamKerja.jamToko}
+          onBerubah={onBerubah}
+        />
+      )}
 
       <div className="rounded-2xl border border-border p-4">
         <h3 className="flex items-center gap-2 text-sm font-bold text-fg">

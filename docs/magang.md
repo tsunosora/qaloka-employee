@@ -526,3 +526,66 @@ Sengaja SEDERHANA: anak cukup tahu "hari ini KONTEN / PRODUKSI bersama siapa"; d
   minggu 16 Nov benar; jepretan konten 5 platform/konsep/grup/kode/absensi/jurnal/rotasi sama; /login /absen /pantau normal; Fingerspot 20 scan.
 - Catatan: Wafiq belum punya absensi sama sekali (9 & 10 Nov) → hari itu terhitung tidak hadir; koreksi lewat dasbor **Absensi → input
   manual** (`/api/attendance/manual`) atau pengajuan izin — tidak dibuat otomatis.
+
+## Jam kerja khusus magang (feat/magang-jam-kerja — BELUM dideploy)
+
+Anak dari sekolah berbeda punya jam berbeda (mis. SMK N 4 09.00–17.00, SMK Negeri 2 Sewon 08.00–16.00). Fitur **Jadwal Kerja**
+(WorkSchedule/roster) tidak cukup: di mode shift otomatis — yang selalu dipakai laporan, simpan status, input manual & impor —
+telat/lembur dihitung dari jam toko global (buka 08:00, akhir pagi 16:00, `shift_late_tolerance`) dan jadwal per-karyawan
+DIABAIKAN (disengaja, `tests/attendance-shift.test.ts`). Mengubah jam toko akan mengubah semua karyawan, jadi jam magang
+dibuat terpisah dan hanya berlaku untuk anak magang.
+
+- **Data** (migrasi `20261115000000_magang_jam_kerja`, ditulis tangan, hanya MENAMBAH): tabel `MagangJamSekolah`
+  (sekolahKunci = `kunciSekolah()` unik, sekolahLabel, jamMasuk/jamPulang "HH:MM", toleransiMenit null = umum) + 3 kolom NULL di
+  `MagangPeserta` (jamMasuk, jamPulang, toleransiMenit; null = ikut sekolah). Hari kerja tetap Senin–Sabtu (libur dari Holiday /
+  Minggu otomatis seperti biasa) — tidak ada kolom hari kerja. Tidak ada tanggal berlaku: perubahan jam berlaku untuk SEMUA hari
+  yang dihitung ulang.
+- **Urutan** (`lib/services/magang/jam-kerja.ts`, murni): kolom anak → jam sekolahnya (kunci tanpa peduli huruf besar/spasi) →
+  tidak ada (jam toko). Per kolom: jam masuk anak boleh diisi sendiri, jam pulang ikut sekolah. Toleransi anak → sekolah → umum.
+  Masuk ≥ pulang = diabaikan. Berlaku hanya untuk peserta `aktif` + karyawan aktif, pada tanggal di dalam masa magang
+  (mulai..selesai); di luar itu jam toko seperti karyawan biasa.
+- **Hitungan** (`lib/services/attendance/jam-magang.ts` → cabang `jamMagang` di `computeAttendanceRow`, menang atas shift otomatis
+  & jadwal per-karyawan; izin/tanpa scan tetap seperti biasa): telat = menit lewat jam masuk bila masuk SETELAH jam masuk +
+  toleransi (dihitung dari jam masuk, sama dengan aturan toko: 09:20 dengan 09:00/15 = telat 20; 09:05 = tepat waktu); **pulang
+  awal** = menit sebelum jam pulang (info saja, status tetap); **lembur** = menit lewat jam PULANG MAGANG (bukan lewat 16:00 — kalau
+  tidak, anak 09–17 selalu "lembur" 60 menit; struk/poin yang membaca lembur ikut angka ini). Tidak ada shift siang/longshift untuk
+  anak magang (shift dilaporkan "pagi"). Baris karyawan biasa tidak membawa kunci tambahan apa pun (`jamKerja`, `pulangAwalMinutes`
+  hanya ada di baris anak berjam khusus).
+- **Disambung di semua jalur** lewat `muatPetaJamMagang()` (`lib/services/magang/jam-kerja-db.ts`, dimuat SEKALI per permintaan,
+  Map karyawan → jam): `aggregateAttendance` (laporan & ekspor dasbor, portal /me Ringkasan/Absensi, pantau guru, struk, poin,
+  timesheet, ringkasan HR), `recomputeStoredStatus` (Fingerspot sync, absen HP, absen tim, jadwal shift, device-sync), input
+  manual, impor scanlog (status + saran jam yang hilang), daftar absensi tidak komplit (saran jam).
+- **Hitung ulang**: `recompute.ts` kini = inti murni `perubahanStatus()` + `rencanaStatusTersimpan()` (tanpa menulis) +
+  `terapkanPerubahan()`. Sesudah jam sekolah/anak disimpan, absensi tersimpan anak yang TERDAMPAK saja (anak sekolah itu / anak itu)
+  dihitung ulang dari tanggal mulai magangnya tapi paling jauh **62 hari** ke belakang (`hitungUlangPeserta`). Mengubah sekolah/
+  masa/aktif di form peserta juga menghitung ulang anak itu bila ia punya jam magang sebelum atau sesudah. Tanpa transaksi, tanpa DDL.
+  Baris lebih tua dari 62 hari tetap nilai lama sampai Fingerspot sync menghitung ulang (sync menghitung semua baris mesin).
+- **API** (`requireManager`): `GET /api/magang/jam` (sekolah + jamnya, peserta + jam efektif, toleransi umum, jam toko);
+  `PUT /api/magang/jam/sekolah` {sekolahKunci, jamMasuk, jamPulang, toleransiMenit?} (toleransi tidak dikirim = tetap; 404 bila
+  sekolah tidak ada di data peserta); `DELETE /api/magang/jam/sekolah?kunci=` (kembali ke jam toko); `PATCH /api/magang/jam/peserta/<id>`
+  (sebagian `.strict()`, hanya kunci yang dikirim ditulis, null = ikut sekolah; 422 bila jam gabungan tidak lengkap/terbalik). Semua
+  menerima `?pratinjau=1` → hanya menghitung dampak (baris berubah + hari terlambat sebelum → sesudah per anak), tidak menulis.
+- **Dasbor**: Magang → **Sekolah** tiap kartu punya bagian *Jam kerja anak magang* (jam masuk, jam pulang, toleransi opsional
+  "kosongkan = toleransi umum", *Simpan jam kerja*, *Cek dampak dulu*, *Hapus (kembali ke jam toko)*). Magang → **Peserta**: daftar
+  menulis "Jam kerja: 09.00–17.00 (jam sekolah / khusus anak ini / jam toko)"; form ubah punya *Jam khusus anak ini (opsional)*
+  (kosong = ikut sekolah, tombol *Kosongkan — ikut sekolah*; hanya kolom yang berubah dikirim). Laporan Absensi: baris anak magang
+  memuat "Jam magang 09.00–17.00 · pulang Xm lebih awal" di bawah status. Rapor: baris "Jam kerja: 09.00–17.00" di kop.
+- **Anak & guru**: /me Ringkasan + Absensi menampilkan kotak "Jam kerja magang 09.00–17.00 — Dihitung terlambat bila masuk lewat
+  09.15" dan "Pulang awal Xm" per hari; pantau guru: "Jam kerja …" di kartu Kehadiran + kotak yang sama di bagian Absensi +
+  "pulang X mnt lebih awal" per hari (`serialHariAbsen.pulangAwalMenit`, `detail.jamKerja`).
+- **Skrip data** `tools/magang/voliko-jam-kerja.ts` (data `tools/magang/data/voliko-jam-kerja.ts`: SMK N 4 Yogyakarta 09:00–17:00 →
+  peserta 5–8; SMK Negeri 2 Sewon 08:00–16:00 → peserta 1–4; toleransi umum): `TZ=Asia/Jakarta npx tsx …` = DRY RUN (rencana +
+  pratinjau per anak: baris berubah, hari terlambat sebelum → sesudah, dihitung di memori); `--jalankan` = cadangan JSON
+  (`~/cadangan/magang-jam-<waktu>`: MagangJamSekolah, kolom jam peserta, absensi anak) lalu buat jam sekolah + hitung ulang. Batal bila
+  migrasi belum ada / sekolah tidak ditemukan / id atau panggilan tidak cocok / anak tercatat di sekolah lain. Jam sekolah yang sudah
+  ada & beda dibiarkan (dilaporkan). Diuji di DB lokal (nama lengkap fiktif): dry-run → jalankan (2 dibuat, 64 baris anak SMK N 4
+  berubah, hari terlambat per anak 8 → 3; Sewon 0 berubah karena sama dengan jam toko) → ulang = 0; checksum absensi karyawan biasa
+  sama; DB tanpa migrasi / tanpa sekolah → BATAL.
+- **Deploy** `tools/magang/deploy-jam-kerja-voliko.sh <SHA>` (ff-only dari `527372b`, satu-satunya migrasi baru =
+  `20261115000000_magang_jam_kerja`, penjaga konten/platform seperti sebelumnya, jam baru harus kosong (exit 4), dan **jepretan absensi
+  karyawan biasa** (jumlah + checksum id/employeeId/scanDate/lateMinutes, scanDate < hari ini, bukan peserta) sebelum = sesudah, beda →
+  exit 5; `--jepret` untuk mengulang jepretan sesudah skrip data).
+- **Tes** `tests/magang-jam-kerja.test.ts`: 09:05/09:20/16:30/17:30, karyawan biasa identik (grid jam masuk × pulang, objek utuh, sama
+  dengan `computeShift`; jadwal per-karyawan & flexible tetap), urutan anak → sekolah → umum per kolom, toleransi, nonaktif/di luar masa,
+  kunci sekolah tanpa peduli huruf besar, batas 62 hari, PATCH sebagian, hitung ulang hanya baris anak, impor, rencana skrip idempoten,
+  nama asli hanya di berkas data, bentuk migrasi. Tangkapan (data fiktif): `.tangkapan/jam-*.png`.

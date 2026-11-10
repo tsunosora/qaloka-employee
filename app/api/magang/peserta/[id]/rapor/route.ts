@@ -10,6 +10,7 @@ import { namaUsaha } from "@/lib/services/upah/data";
 import { namaPengurus } from "@/lib/services/magang/pembimbing";
 import { kategoriDanPeta, progresPeserta } from "@/lib/services/magang/misi-db";
 import { labelKategori } from "@/lib/services/magang/misi";
+import { jamEfektifPeserta, petaJamSekolah } from "@/lib/services/magang/jam-kerja";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -82,6 +83,8 @@ export const GET = route<Ctx>(async (_req, ctx) => {
       mulai: toYmd(p.mulai),
       selesai: p.selesai ? toYmd(p.selesai) : null,
       catatan: p.catatan,
+      // Jam kerja khusus magang (anak → sekolah); null = jam toko.
+      jamKerja: jamEfektifPeserta(p, petaJamSekolah(await prisma.magangJamSekolah.findMany()))?.label ?? null,
     },
     rapor: { ...rapor, baris: rapor.baris.map((b) => ({ ...b, ...(infoPos.get(b.posId) ?? { deskripsi: null, pembimbing: null }) })) },
     tugas,

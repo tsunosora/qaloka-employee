@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
-import { atMidnight } from "@/lib/services/leave/service";
+import { atMidnight, toYmd } from "@/lib/services/leave/service";
 import { pesertaSchema } from "@/lib/validators/magang";
+import { jamEfektifPeserta, petaJamSekolah } from "@/lib/services/magang/jam-kerja";
+import { hitungUlangPeserta } from "@/lib/services/magang/jam-kerja-simpan";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -26,6 +28,13 @@ export const PATCH = route<Ctx>(async (req, ctx) => {
       catatan: d.catatan,
     },
   });
+  // Sekolah/masa/aktif bisa mengubah jam kerja khusus magang → hitung ulang absensi tersimpan anak ini bila
+  // ada jam magang sebelum ATAU sesudah (anak tanpa jam magang: tidak disentuh).
+  const ps = petaJamSekolah(await prisma.magangJamSekolah.findMany());
+  if (jamEfektifPeserta(ada, ps) || jamEfektifPeserta({ ...ada, sekolah: d.sekolah }, ps)) {
+    const mulai = [toYmd(ada.mulai), d.mulai].sort()[0];
+    await hitungUlangPeserta(prisma, [{ id, employeeId: ada.employeeId, mulai }]);
+  }
   return json({ ok: true });
 });
 

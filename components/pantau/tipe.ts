@@ -24,6 +24,8 @@ export type HariAbsen = {
   pulang: string | null;
   status: StatusHari;
   terlambatMenit: number;
+  /** Jam kerja khusus magang: menit pulang sebelum jam pulang. */
+  pulangAwalMenit?: number;
   keterangan: string | null;
   scan: { jam: string; sumber: "HP" | "Mesin"; lokasi: string | null; jarakM: number | null; fotoUrl: string | null }[];
 };
@@ -31,6 +33,8 @@ export type HariAbsen = {
 export type DetailAnak = {
   anak: AnakRingkas;
   rentang: { dari: string; sampai: string };
+  /** Jam kerja khusus magang yang dipakai menghitung telat; null = jam toko. */
+  jamKerja?: { label: string; masuk: string; toleransiMenit: number } | null;
   absensi: HariAbsen[];
   jurnal: { id: number; tanggal: string; pos: string | null; kegiatan: string; kendala: string | null; komentarPembimbing: string | null; dicek: boolean; foto: string[] }[];
   izin: {

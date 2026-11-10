@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { portalSecret } from "@/lib/services/portal/auth";
 import { atMidnight, toYmd, LEAVE_MACHINE_NAME } from "@/lib/services/leave/service";
 import { aggregateAttendance } from "@/lib/services/attendance/aggregate";
+import { labelJamKerja } from "@/lib/services/attendance/jam-magang";
 import { namaUsaha } from "@/lib/services/upah/data";
 import { daftarFoto } from "./jurnal";
 import { hariIni, keYmd } from "./layanan";
@@ -293,6 +294,7 @@ export async function detailAnakGuru(t: TautanDb, p: PesertaSekolah, r: { dari: 
         pulang: lap?.clockOut ?? (scan.length > 1 ? scan[scan.length - 1].jam : null),
         status,
         terlambatMenit: lap && status === "terlambat" ? lap.lateMinutes : 0,
+        pulangAwalMenit: lap && !luarHariKerja && (status === "hadir" || status === "terlambat") ? lap.pulangAwalMinutes ?? 0 : 0,
         keterangan: luarHariKerja
           ? "Absen di hari libur/Minggu (tidak dihitung)"
           : status === "izin" || status === "sakit"
@@ -346,9 +348,12 @@ export async function detailAnakGuru(t: TautanDb, p: PesertaSekolah, r: { dari: 
     sideQuest: progres.get(p.id) ?? null,
   });
 
+  // Jam kerja khusus magang yang dipakai menghitung telat (hari terakhir yang memakainya) — ditampilkan ke guru.
+  const jamLap = [...laporan.values()].reverse().find((x) => x.jamKerja)?.jamKerja ?? null;
   return {
     anak: ringkas,
     rentang: r,
+    jamKerja: jamLap ? { label: labelJamKerja(jamLap.masuk, jamLap.pulang), masuk: jamLap.masuk, toleransiMenit: jamLap.toleransiMenit } : null,
     absensi: absenRows,
     jurnal: jurnalYmd.map((j) => serialJurnalGuru(j, (id, n) => `${dasar}/jurnal/${id}/foto/${n}`)),
     izin: izin.map((l) =>

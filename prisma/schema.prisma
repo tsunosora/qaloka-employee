@@ -1074,6 +1074,11 @@ model MagangPeserta {
   catatan        String?   @db.Text
   // Kode anak di jadwal konten (kolom CODE di sheet pembina: 1, 2, 3 …) — diatur pembina, unik.
   kodeKonten     Int?      @unique
+  // Jam kerja khusus anak ini (15 Nov 2026; "HH:MM"). null = ikut jam sekolahnya (MagangJamSekolah) → jam toko.
+  jamMasuk       String?   @db.VarChar(5)
+  jamPulang      String?   @db.VarChar(5)
+  // Toleransi telat (menit). null = ikut sekolah → toleransi umum (Setting shift_late_tolerance).
+  toleransiMenit Int?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -1502,4 +1507,20 @@ model MagangHarianPengecualian {
   @@index([pesertaId])
   @@index([pasanganPesertaId])
   @@index([dibuatOlehId])
+}
+
+// Jam kerja anak magang per SEKOLAH (15 Nov 2026) — bawaan untuk semua anak sekolah itu; MagangPeserta.jamMasuk/
+// jamPulang/toleransiMenit menimpa per anak. Hari kerja tetap Senin–Sabtu (libur dari Holiday/Minggu seperti biasa).
+// Karyawan biasa TIDAK terpengaruh: hanya peserta aktif di dalam masa magangnya (lib/services/magang/jam-kerja.ts).
+model MagangJamSekolah {
+  id             Int      @id @default(autoincrement())
+  // kunciSekolah() dari MagangPeserta.sekolah (huruf kecil, spasi dirapatkan) — satu baris per rombongan sekolah.
+  sekolahKunci   String   @unique @db.VarChar(150)
+  sekolahLabel   String   @db.VarChar(150)
+  jamMasuk       String   @db.VarChar(5)
+  jamPulang      String   @db.VarChar(5)
+  // null = toleransi umum (Setting shift_late_tolerance).
+  toleransiMenit Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

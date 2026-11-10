@@ -34,6 +34,8 @@ export type RaporPayload = {
     mulai: string;
     selesai: string | null;
     catatan: string | null;
+    /** Jam kerja khusus magang, mis. "09.00–17.00"; null/tidak ada = jam toko. */
+    jamKerja?: string | null;
   };
   rapor: {
     baris: Baris[];
@@ -95,6 +97,7 @@ export function RaporIsi({ data, onNilai, className = "" }: { data: RaporPayload
           <h1 className="font-display text-2xl font-bold text-fg">{p.nama}</h1>
           <p className="text-sm text-muted">{[p.sekolah, p.jurusan].filter(Boolean).join(" · ")}</p>
           {guru && <p className="text-sm text-muted">Guru pembimbing: {guru}</p>}
+          {p.jamKerja && <p className="tabular text-sm text-muted">Jam kerja: {p.jamKerja}</p>}
           <p className="text-sm text-muted">
             {longDate(p.mulai)} – {p.selesai ? longDate(p.selesai) : "sekarang"} · {r.mingguBerjalan} minggu · {r.jumlahPos} pos kerja
           </p>

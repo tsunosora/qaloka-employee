@@ -5,6 +5,7 @@ import { IconChevronDown } from "@/components/ui/icons";
 import { longDate, shortDate, soft } from "@/components/portal/ui";
 import { tglPendek, warnaNilai } from "@/components/magang/ui";
 import { GambarMini, Lightbox } from "./Lightbox";
+import { JamKerjaMagang } from "@/components/portal/JamKerjaMagang";
 import { LencanaLibur, LencanaTugas } from "@/components/magang/harian/ui";
 import { STATUS_HARI, STATUS_IZIN, type AnakRingkas, type DetailAnak, type StatusHari } from "./tipe";
 
@@ -96,6 +97,7 @@ export function BagianAnak({ d }: { d: DetailAnak }) {
               {k.persen == null ? "—" : `${k.persen}%`}
             </dd>
             <dd className="text-xs text-muted">{teksKehadiran(k)}{terlambat ? ` · terlambat ${terlambat}×` : ""}</dd>
+            {d.jamKerja && <dd className="tabular mt-0.5 text-xs font-semibold text-fg">Jam kerja {d.jamKerja.label}</dd>}
           </div>
           <div className="rounded-xl border border-border p-3">
             <dt className="text-xs font-medium text-muted">Nilai akhir sementara</dt>
@@ -203,6 +205,12 @@ export function BagianAnak({ d }: { d: DetailAnak }) {
         {d.absensi.length === 0 ? (
           <Kosong>Belum ada data absensi di rentang ini.</Kosong>
         ) : (
+          <>
+          {d.jamKerja && (
+            <div className="mb-2">
+              <JamKerjaMagang jam={d.jamKerja} />
+            </div>
+          )}
           <ul className="divide-y divide-border">
             {d.absensi.map((h) => (
               <li key={h.tanggal} className="py-3">
@@ -210,6 +218,7 @@ export function BagianAnak({ d }: { d: DetailAnak }) {
                   <span className="text-sm font-semibold text-fg">{shortDate(h.tanggal)}</span>
                   <span className="flex items-center gap-2">
                     {h.terlambatMenit > 0 && <span className="text-xs text-muted">{h.terlambatMenit} mnt</span>}
+                    {(h.pulangAwalMenit ?? 0) > 0 && <span className="text-xs text-muted">pulang {h.pulangAwalMenit} mnt lebih awal</span>}
                     <ChipStatusHari status={h.status} />
                   </span>
                 </div>
@@ -236,6 +245,7 @@ export function BagianAnak({ d }: { d: DetailAnak }) {
               </li>
             ))}
           </ul>
+          </>
         )}
       </Bagian>
 

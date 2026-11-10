@@ -3,11 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { requireManager, json, badRequest, notFound, route } from "@/lib/http";
 import { atMidnight, toYmd } from "@/lib/services/leave/service";
 import { pesertaSchema } from "@/lib/validators/magang";
+import { jamEfektifPeserta, petaJamSekolah } from "@/lib/services/magang/jam-kerja";
+import { kunciSekolah } from "@/lib/services/magang/sekolah";
+import { labelJamKerja } from "@/lib/services/attendance/jam-magang";
 
 /** Daftar peserta magang + karyawan yang bisa dijadikan peserta (belum terdaftar). */
 export const GET = route(async () => {
   await requireManager();
-  const [peserta, calon] = await Promise.all([
+  const [peserta, calon, jamSekolah] = await Promise.all([
     prisma.magangPeserta.findMany({
       where: { employee: { deletedAt: null } },
       orderBy: [{ aktif: "desc" }, { mulai: "asc" }, { id: "asc" }],
@@ -18,7 +21,9 @@ export const GET = route(async () => {
       orderBy: { fullName: "asc" },
       select: { id: true, fullName: true, employeeCode: true },
     }),
+    prisma.magangJamSekolah.findMany(),
   ]);
+  const ps = petaJamSekolah(jamSekolah);
   return json({
     peserta: peserta.map((p) => ({
       id: p.id,
@@ -34,6 +39,15 @@ export const GET = route(async () => {
       selesai: p.selesai ? toYmd(p.selesai) : null,
       aktif: p.aktif && p.employee.isActive,
       catatan: p.catatan,
+      // Jam kerja khusus magang: kolom anak (null = ikut sekolah), jam sekolahnya, dan hasil akhirnya.
+      jamMasuk: p.jamMasuk,
+      jamPulang: p.jamPulang,
+      toleransiMenit: p.toleransiMenit,
+      jamSekolah: (() => {
+        const j = ps.get(kunciSekolah(p.sekolah));
+        return j ? { label: labelJamKerja(j.jamMasuk, j.jamPulang), jamMasuk: j.jamMasuk, jamPulang: j.jamPulang, toleransiMenit: j.toleransiMenit } : null;
+      })(),
+      jamEfektif: jamEfektifPeserta(p, ps),
     })),
     calon,
   });

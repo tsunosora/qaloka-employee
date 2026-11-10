@@ -1,6 +1,7 @@
 import { computeAttendanceRow, type ScheduleInfo } from "./report";
 import { computeShift, suggestMissingTime, type ShiftConfig, type ShiftKind } from "./shift";
 import type { ParsedScanRow } from "./import-html";
+import type { JamMagangHari } from "./jam-magang";
 
 export type DerivedScan = { time: string; scanType: "in" | "out" };
 
@@ -114,6 +115,8 @@ export type PreviewOptions = {
    * dan `libur` ikut dihitung sebagai hari libur. Tanpa ini = jadwal tetap (perilaku lama).
    */
   jadwalHari?: ((employeeId: number, dateISO: string) => { schedule: ScheduleInfo | null; libur: boolean }) | null;
+  /** Jam kerja khusus anak magang (lib/services/magang/jam-kerja.ts). Tanpa ini / null = aturan umum. */
+  jamMagang?: ((employeeId: number, dateISO: string) => JamMagangHari | null) | null;
 };
 
 /** "HH:MM" -> menit. */
@@ -168,12 +171,14 @@ export function buildImportPreview(
     // Roster hari itu (bila ada) menang atas jadwal tetap; libur roster = hari libur.
     const hari = opts.jadwalHari?.(emp.id, r.dateISO) ?? null;
     const liburHari = holiday || Boolean(hari?.libur);
+    const jamMagang = opts.jamMagang?.(emp.id, r.dateISO) ?? null;
     const computed = computeAttendanceRow({
       employeeId: emp.id,
       date: r.dateISO,
       schedule: hari ? hari.schedule : emp.workSchedule,
       isHoliday: liburHari,
       shiftConfig: opts.shiftConfig ?? null,
+      jamMagang,
       scans: derived.map((d) => ({
         scanDate: new Date(`${r.dateISO}T${d.time}`),
         scanType: d.scanType,
@@ -183,7 +188,10 @@ export function buildImportPreview(
     // Mode flexible (jam masuk bebas): pertahankan label "flexible", tak ada shift jam-dinding.
     const isFlexible = computed.shift === "flexible";
     let shift: ShiftKind | null = isFlexible ? "flexible" : null;
-    if (!isFlexible && opts.shiftConfig && (computed.clockIn || computed.clockOut)) {
+    if (jamMagang) {
+      // Anak magang berjam khusus: satu shift tetap; saran jam yang hilang = jam masuk/pulang magangnya.
+      shift = computed.clockIn || computed.clockOut ? computed.shift : null;
+    } else if (!isFlexible && opts.shiftConfig && (computed.clockIn || computed.clockOut)) {
       shift = computeShift(
         computed.clockIn ? hm(computed.clockIn) : null,
         computed.clockOut ? hm(computed.clockOut) : null,
@@ -194,7 +202,9 @@ export function buildImportPreview(
     // Saran jam yang hilang bila absensi tidak komplit (hanya masuk / hanya pulang).
     // Tak berlaku untuk flexible (tak ada jam mulai/selesai tetap).
     let suggested: string | null = null;
-    if (!isFlexible && opts.shiftConfig && shift && !!computed.clockIn !== !!computed.clockOut) {
+    if (jamMagang) {
+      if (!!computed.clockIn !== !!computed.clockOut) suggested = computed.clockIn ? jamMagang.jamPulang : jamMagang.jamMasuk;
+    } else if (!isFlexible && opts.shiftConfig && shift && !!computed.clockIn !== !!computed.clockOut) {
       suggested = suggestMissingTime(shift, computed.clockIn ? "out" : "in", opts.shiftConfig);
     }
 

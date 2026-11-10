@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireSession, json, route } from "@/lib/http";
 import { computeShift, suggestMissingTime, loadShiftConfig } from "@/lib/services/attendance/shift";
+import { muatPetaJamMagang } from "@/lib/services/magang/jam-kerja-db";
 
 function fmt(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -39,6 +40,7 @@ export const GET = route(async (req: Request) => {
   }
 
   const cfg = await loadShiftConfig();
+  const jamMagang = await muatPetaJamMagang(prisma, cfg.lateToleranceMinutes, [...byEmp.keys()]);
   const result = [];
   for (const [employeeId, list] of byEmp) {
     const ins = list.filter((s) => s.scanType === "in");
@@ -54,6 +56,8 @@ export const GET = route(async (req: Request) => {
     const inMin = hasIn ? minOfDay(ins[0].scanDate) : null;
     const outMin = hasOut ? minOfDay(outs[outs.length - 1].scanDate) : null;
     const shift = computeShift(inMin, outMin, cfg).shift;
+    // Anak magang berjam khusus: saran = jam masuk/pulang magangnya, bukan jam toko.
+    const jm = jamMagang.get(employeeId, dateStr);
 
     result.push({
       employeeId,
@@ -63,7 +67,7 @@ export const GET = route(async (req: Request) => {
       clockIn: hasIn ? fmt(ins[0].scanDate) : null,
       clockOut: hasOut ? fmt(outs[outs.length - 1].scanDate) : null,
       missing,
-      suggested: suggestMissingTime(shift, missing, cfg),
+      suggested: jm ? (missing === "in" ? jm.jamMasuk : jm.jamPulang) : suggestMissingTime(shift, missing, cfg),
     });
   }
 

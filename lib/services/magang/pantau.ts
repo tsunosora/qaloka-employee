@@ -352,6 +352,8 @@ export function serialHariAbsen(d: {
   pulang: string | null;
   status: StatusHariGuru;
   terlambatMenit: number;
+  /** Jam kerja khusus magang: menit pulang sebelum jam pulang (0 = tidak / tanpa jam khusus). */
+  pulangAwalMenit?: number;
   keterangan: string | null;
   scan: readonly ScanGuru[];
 }) {
@@ -361,6 +363,7 @@ export function serialHariAbsen(d: {
     pulang: d.pulang,
     status: d.status,
     terlambatMenit: d.terlambatMenit,
+    pulangAwalMenit: d.pulangAwalMenit ?? 0,
     keterangan: d.keterangan,
     scan: d.scan.map((s) => ({ jam: s.jam, sumber: s.sumber, lokasi: s.lokasi, jarakM: s.jarakM, fotoUrl: s.fotoUrl })),
   };

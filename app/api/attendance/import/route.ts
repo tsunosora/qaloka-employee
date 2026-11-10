@@ -6,6 +6,7 @@ import { nextEmployeeCode } from "@/lib/services/employee-code";
 import { bolehMenambah } from "@/lib/lisensi/penjaga";
 import { loadShiftConfig } from "@/lib/services/attendance/shift";
 import { jadwalEfektif } from "@/lib/services/jadwal-shift/efektif";
+import { muatPetaJamMagang } from "@/lib/services/magang/jam-kerja-db";
 import { analyzeScanlog, describeScanlogFailure } from "@/lib/services/attendance/import-html";
 import {
   buildImportPreview,
@@ -108,11 +109,14 @@ export const POST = route(async (req: Request) => {
     tanggalFile[0],
     tanggalFile[tanggalFile.length - 1]
   );
+  // Jam kerja khusus anak magang (peserta aktif dalam masanya); karyawan biasa → null → tak berubah.
+  const jamMagang = await muatPetaJamMagang(prisma, shiftConfig.lateToleranceMinutes, employees.map((e) => e.id));
   const preview = buildImportPreview(parsed, employees, {
     holidayDates,
     autoSunday,
     shiftConfig,
     jadwalHari: peta.jumlahRoster > 0 ? (id, d) => peta.get(id, d) : null,
+    jamMagang: jamMagang.employeeIds.length > 0 ? (id, d) => jamMagang.get(id, d) : null,
   });
 
   // Deteksi conflict: absensi eksisting hari itu dari mesin != import-html.
