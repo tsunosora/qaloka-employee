@@ -16,6 +16,7 @@ import { susunRapor } from "./rapor";
 import { predikat } from "./nilai";
 import { kategoriDanPeta, progresPeserta } from "./misi-db";
 import { labelKategori } from "./misi";
+import { grupAnak, whereMilikAnak } from "./konten-db";
 import { daftarSekolah, kunciSekolah, sekolahSama } from "./sekolah";
 import {
   PANTAU_COOKIE,
@@ -362,12 +363,25 @@ export async function detailAnakGuru(t: TautanDb, p: PesertaSekolah, r: { dari: 
       .filter((x) => x.senin >= seninAwal && x.senin <= r.sampai)
       .map((x) => serialTugasGuru({ ...x, predikat: predikat(x.nilai) }))
       .reverse(),
+    // Jadwal konten (12 Nov 2026): hanya hitungan, tanpa tautan/judul.
+    konten: await hitungKontenGuru(p.id, r),
     sideQuest: serialSideQuest(
       progres.get(p.id) ?? null,
       misiSelesai.map((k) => ({ judul: k.misi.judul, kategoriLabel: labelKategori(k.misi.kategori, peta), tanggal: k.diputusAt ? toYmd(k.diputusAt) : null }))
     ),
     rapor: serialRaporRingkas(rapor),
   };
+}
+
+/** Konten terjadwal (kode anak sendiri + grupnya) dalam rentang, dan yang berstatus final. */
+async function hitungKontenGuru(pesertaId: number, r: { dari: string; sampai: string }) {
+  const grupIds = await grupAnak(prisma, pesertaId);
+  const where = { AND: [whereMilikAnak(pesertaId, grupIds), { tanggal: { gte: atMidnight(r.dari), lte: atMidnight(r.sampai) } }] };
+  const [terjadwal, selesai] = await Promise.all([
+    prisma.magangKonten.count({ where }),
+    prisma.magangKonten.count({ where: { AND: [where, { status: { final: true } }] } }),
+  ]);
+  return { selesai, terjadwal };
 }
 
 // ── Admin (dasbor, requireManager di rute) ─────────────────────────────────────────────────────────

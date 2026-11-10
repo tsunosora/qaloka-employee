@@ -276,3 +276,46 @@ Guru pembimbing dari sekolah memantau anak sekolahnya sendiri lewat tautan + PIN
   halaman Magang → Sekolah ada di build (`/magang/sekolah` → login); hitungan magang/izin sebelum = sesudah; rotasi 7 anak (80 blok),
   jurnal, absensi 9 Nov (Fingerspot 22, HP 8) identik; MagangPantau = 0 (tautan guru dibuat Faisal sendiri). Webhook Fingerspot hidup
   (GET 405); deploy tengah malam → scan baru belum ada, cek pagi.
+
+## Jadwal konten (feat/magang-jadwal-konten — BELUM dideploy)
+
+Meniru sheet pembina konten (kolom NO, TANGGAL, JUDUL POSTINGAN, KLASIFIKASI KONSEP, REF, STATUS, CODE, NAMA PKL, CAPTION,
+LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tiap Minggu; panel kiri catatan & brief).
+
+- **Model** (migrasi `20261112000000_magang_jadwal_konten`, hanya MENAMBAH: 5 tabel + `MagangPeserta.kodeKonten` nullable unik;
+  4 status bawaan `INSERT IGNORE`): `MagangKontenKonsep` (`kunci` tetap, `nama` + `sub` → "ENTERTAIMENT (SITKOM)" — ejaan pembina
+  disimpan apa adanya, `warna` = kunci palet/hex, `referensi` [{label,url}]), `MagangKontenStatus` (`anakBoleh` = anak boleh memilih,
+  `final` = dihitung selesai & hanya pembina; bawaan Belum take / Sudah take / Editing / Selesai-Diposting), `MagangKontenGrup` +
+  `MagangKontenGrupAnggota` (terpisah dari tim rotasi; `urutan` = giliran hari grup), `MagangKonten` (satu baris = satu konten:
+  anak ATAU grup ATAU belum dibagi, `usulan`, `urutan` untuk >1 baris/hari, `selesaiAt` diisi saat status final, pengubah akun/karyawan).
+  Catatan & brief = Setting `magang_konten_brief` (JSON drive/catatan/font/preset/caption/hashtag, zod `briefSchema`); pola hari =
+  Setting `magang_konten_pola` (bawaan Sen SITKOM, Sel FLEXING, Rab SITKOM, Kam FLEXING, Jum TALK, Sab FLEXING, EMPATHY tiap 14 hari).
+- **Dasbor** Magang → **Jadwal Konten** (`/magang/konten?bulan=YYYY-MM`, `requireManager`): tabel padat (kepala & kolom NO/TANGGAL
+  lengket, gulir ke samping), sunting di sel (Enter/keluar = simpan, Esc = batal; tampil seketika, dibatalkan bila server menolak),
+  pilihan konsep/status/CODE ("1 · panggilan", "GRUB A") berupa daftar berwarna + teks, tautan sebagai chip (`noopener`), NAMA PKL dari
+  kode/anggota grup, tambah baris per tanggal, hapus (konfirmasi), saringan anak/grup/status, legenda kode & grup, lencana **Usulan** +
+  *Tandai disetujui* / *Setujui semua usulan*. Panel *Catatan & brief* (bawaan tampil di layar ≥1536 px; tombol tampil/sembunyi):
+  drive, note, font, preset, referensi per konsep, caption + hashtag dengan *Salin caption*. **Setelan**: konsep, status, grup + anggota,
+  kode anak (unik, tukar kode aman), pola hari.
+- **Generator** `susunBulan()` (`lib/services/magang/konten.ts`, *Buat jadwal bulan berikut* → pratinjau → simpan): Senin–Sabtu;
+  Minggu & Holiday dilewati tanpa memakan giliran; kode anak melanjutkan kode terakhir sebelum bulan itu (berputar); Sabtu yang jatuh
+  ≥ EMPATHY terakhir + selang → hari grup untuk grup berikutnya (hari grup tidak memakan giliran anak; Sabtu libur → Sabtu berikutnya;
+  tanpa riwayat → Sabtu kedua, grup pertama). Bawaan hanya mengisi tanggal kosong (tanggal terisi ikut memajukan giliran → tanpa
+  duplikat); *Ganti* menghapus baris yang BELUM dikerjakan saja (status awal, semua isian kosong). Baris baru: Belum take, usulan.
+- **HP anak** (`/me/<token>` tab Magang, kartu **Jadwal Konten** di bawah pos minggu ini): *Konten hari ini* + pengingat ("Hari ini jadwal
+  kontenmu — <note>"), konsep, catatan pembina, referensi, font/preset/drive, caption (*Salin caption*); anak mengisi judul, link footage,
+  link ekspor, dan status `anakBoleh`. Status final tampil "Divalidasi pembina" (terkunci). Daftar *Berikutnya* / *Sebelumnya* (4 minggu
+  ke belakang – 6 minggu ke depan). Rute `GET/PATCH /api/public/portal/<token>/magang/konten[/id]`: hanya baris kode sendiri / grupnya
+  (lainnya 404), mode owner baca saja (403), status final / bukan anakBoleh → 403, baris final → 409, tautan hanya http(s).
+- **Pantau guru**: detail anak menampilkan "Konten: x selesai dari y terjadwal" (hitungan saja, tanpa tautan).
+- **Impor Voliko** `tools/magang/voliko-jadwal-konten.ts` (data: `tools/magang/data/voliko-konten-nov2026.ts`): `TZ=Asia/Jakarta npx tsx
+  tools/magang/voliko-jadwal-konten.ts` = DRY RUN (cetak tabel), `--jalankan` = cadangan JSON (`--cadangan=`, bawaan
+  `~/cadangan/magang-konten-<waktu>`) lalu satu transaksi tanpa DDL. Batal bila migrasi belum ada / id+panggilan anak tidak cocok / kode
+  dipegang anak lain. Idempoten (konsep/status per kunci, grup per nama, kode hanya bila kosong/sama, brief hanya bila belum ada, baris
+  (tanggal, konsep, kode/grup) yang sama dilewati). Isi: kode 1–7, GRUB A/B/C, 4 konsep + referensi IG, brief (URL drive "1. VOLIKO
+  PRINT" BELUM diketahui → kosong), 2–14 Nov persis sheet, 16–28 Nov usulan dengan 3 anak baru. Senin 30 Nov tidak ada di sheet —
+  isi lewat *Buat jadwal* bulan November (isi tanggal kosong). Giliran grup sesudahnya: C (12 Des), A, B.
+- **Deploy** `tools/magang/deploy-jadwal-konten-voliko.sh <SHA>` (ff-only dari `da81381`, cadangan DB+.env+storage, migrasi, build,
+  restart `ratemystaff` saja; hitungan MagangKonten* sesudah = konten 0, status 4). Impor data = langkah terpisah sesudahnya.
+- Tes: `magang-konten` (generator meniru November pembina, usulan 7 anak, pemisah Minggu, tautan, cakupan & izin anak, brief, rute),
+  `magang-konten-impor` (konsistensi data, 24 baris Senin–Sabtu, nama asli hanya di berkas data).

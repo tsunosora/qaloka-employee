@@ -87,6 +87,7 @@ const NAV: NavGroup[] = [
       { label: "Minggu Ini", href: "/magang" },
       { label: "Rotasi Pos", href: "/magang/rotasi" },
       { label: "Pos & Soal", href: "/magang/pos" },
+      { label: "Jadwal Konten", href: "/magang/konten" },
       { label: "Side Quest", href: "/magang/misi" },
       { label: "Peserta", href: "/magang/peserta" },
       { label: "Sekolah", href: "/magang/sekolah" },

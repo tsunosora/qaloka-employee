@@ -73,6 +73,7 @@ model User {
   magangJurnalDicek   MagangJurnal[]      @relation("MagangJurnalCek")
   magangMisiDiputus   MagangMisiKiriman[] @relation("MagangMisiPutus")
   magangPantauDibuat  MagangPantau[]      @relation("MagangPantauDibuat")
+  magangKontenDiubah  MagangKonten[]      @relation("MagangKontenDiubah")
 }
 
 model Department {
@@ -199,6 +200,7 @@ model Employee {
   magangDinilai        MagangTugas[]          @relation("MagangPenilaiKaryawan")
   magangJurnalDicek    MagangJurnal[]         @relation("MagangJurnalCekKaryawan")
   magangMisiDiputus    MagangMisiKiriman[]    @relation("MagangMisiPutusKaryawan")
+  magangKontenDiubah   MagangKonten[]         @relation("MagangKontenDiubahKaryawan")
 
   @@index([isActive])
 }
@@ -1069,14 +1071,18 @@ model MagangPeserta {
   selesai        DateTime?
   aktif          Boolean   @default(true)
   catatan        String?   @db.Text
+  // Kode anak di jadwal konten (kolom CODE di sheet pembina: 1, 2, 3 …) — diatur pembina, unik.
+  kodeKonten     Int?      @unique
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  employee  Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  penugasan MagangPenugasan[]
-  tugas     MagangTugas[]
-  jurnal    MagangJurnal[]
-  misi      MagangMisiKiriman[]
+  employee   Employee                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  penugasan  MagangPenugasan[]
+  tugas      MagangTugas[]
+  jurnal     MagangJurnal[]
+  misi       MagangMisiKiriman[]
+  konten     MagangKonten[]
+  kontenGrup MagangKontenGrupAnggota[]
 
   @@index([sekolah])
 }
@@ -1311,4 +1317,109 @@ model MagangPantau {
 
   @@index([sekolahKunci])
   @@index([dibuatOlehId])
+}
+
+// ── Jadwal konten magang (12 Nov 2026) ───────────────────────────────────────────────────────────
+// Meniru sheet pembina: satu baris = satu konten pada satu tanggal (Senin–Sabtu), dipegang SATU anak
+// (pesertaId, kode anak = MagangPeserta.kodeKonten) ATAU SATU grup (grupId) — keduanya kosong = belum
+// dibagi. Logika murni: lib/services/magang/konten.ts. Catatan & brief (drive, font, preset, caption)
+// = Setting `magang_konten_brief` (JSON), pola hari = Setting `magang_konten_pola`.
+
+// Klasifikasi konsep, mis. nama "ENTERTAIMENT" + sub "SITKOM" (ejaan pembina disimpan apa adanya).
+// warna = kunci palet (lib/services/magang/konten.ts WARNA_KONTEN) atau #rrggbb. referensi = [{label,url}].
+model MagangKontenKonsep {
+  id        Int      @id @default(autoincrement())
+  kunci     String   @unique @db.VarChar(40)
+  nama      String   @db.VarChar(60)
+  sub       String?  @db.VarChar(60)
+  warna     String   @default("putih") @db.VarChar(20)
+  referensi Json
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  konten MagangKonten[]
+}
+
+// Status konten (dropdown STATUS). anakBoleh = anak boleh memilihnya dari HP; final = dihitung selesai
+// dan HANYA pembina yang memasangnya (baris final terkunci untuk anak).
+model MagangKontenStatus {
+  id        Int      @id @default(autoincrement())
+  kunci     String   @unique @db.VarChar(40)
+  nama      String   @db.VarChar(60)
+  warna     String   @default("abu") @db.VarChar(20)
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  anakBoleh Boolean  @default(false)
+  final     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  konten MagangKonten[]
+}
+
+// Grup konten (mis. "GRUB A") — terpisah dari tim rotasi pos. urutan = urutan giliran PROMOTION (EMPATHY).
+model MagangKontenGrup {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(60)
+  warna     String   @default("merah") @db.VarChar(20)
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anggota MagangKontenGrupAnggota[]
+  konten  MagangKonten[]
+}
+
+model MagangKontenGrupAnggota {
+  id        Int @id @default(autoincrement())
+  grupId    Int
+  pesertaId Int
+
+  grup    MagangKontenGrup @relation(fields: [grupId], references: [id], onDelete: Cascade)
+  peserta MagangPeserta    @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+
+  @@unique([grupId, pesertaId])
+  @@index([pesertaId])
+}
+
+// Satu baris jadwal konten. usulan = dibuat generator / belum disetujui pembina (lencana "Usulan").
+// urutan = urutan di hari yang sama (>1 baris per tanggal). selesaiAt diisi saat status final dipasang.
+model MagangKonten {
+  id                   Int       @id @default(autoincrement())
+  tanggal              DateTime
+  konsepId             Int
+  pesertaId            Int?
+  grupId               Int?
+  statusId             Int
+  judul                String?   @db.VarChar(200)
+  ref                  String?   @db.VarChar(500)
+  caption              String?   @db.Text
+  linkFootage          String?   @db.VarChar(500)
+  linkEkspor           String?   @db.VarChar(500)
+  catatan              String?   @db.Text
+  usulan               Boolean   @default(false)
+  urutan               Int       @default(0)
+  diubahOlehId         Int?
+  diubahOlehKaryawanId Int?
+  selesaiAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  konsep             MagangKontenKonsep @relation(fields: [konsepId], references: [id], onDelete: Restrict)
+  peserta            MagangPeserta?     @relation(fields: [pesertaId], references: [id], onDelete: SetNull)
+  grup               MagangKontenGrup?  @relation(fields: [grupId], references: [id], onDelete: Restrict)
+  status             MagangKontenStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  diubahOleh         User?              @relation("MagangKontenDiubah", fields: [diubahOlehId], references: [id], onDelete: SetNull)
+  diubahOlehKaryawan Employee?          @relation("MagangKontenDiubahKaryawan", fields: [diubahOlehKaryawanId], references: [id], onDelete: SetNull)
+
+  @@index([tanggal])
+  @@index([pesertaId])
+  @@index([grupId])
+  @@index([konsepId])
+  @@index([statusId])
+  @@index([diubahOlehId])
+  @@index([diubahOlehKaryawanId])
 }

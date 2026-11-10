@@ -117,6 +117,17 @@ export function BagianAnak({ d }: { d: DetailAnak }) {
               {d.sideQuest.selesai} / {d.sideQuest.total} misi
             </dd>
           </div>
+          {d.konten && d.konten.terjadwal > 0 && (
+            <div className="rounded-xl border border-border p-3">
+              <dt className="text-xs font-medium text-muted">Jadwal konten</dt>
+              <dd className="tabular font-display text-xl font-bold text-fg">
+                {d.konten.selesai} / {d.konten.terjadwal}
+              </dd>
+              <dd className="text-xs text-muted">
+                Konten: {d.konten.selesai} selesai dari {d.konten.terjadwal} terjadwal
+              </dd>
+            </div>
+          )}
         </dl>
         {d.anak.posIni && (
           <p className="mt-3 text-sm text-fg">

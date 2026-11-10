@@ -6,6 +6,7 @@ import { IconAlert, IconCheck, IconX } from "@/components/ui/icons";
 import { Card, longDate, soft } from "@/components/portal/ui";
 import { tglPendek, warnaNilai } from "@/components/magang/ui";
 import { JurnalMagang } from "@/components/portal/JurnalMagang";
+import { KontenMagang } from "@/components/portal/KontenMagang";
 import { SideQuestMagang } from "@/components/portal/SideQuestMagang";
 import { hitungBenar, predikat } from "@/lib/services/magang/nilai";
 
@@ -114,6 +115,8 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
           <p className="text-sm text-muted">Minggu ini kamu belum dijadwalkan di pos mana pun. Tanyakan ke pembimbing.</p>
         )}
       </Card>
+
+      <KontenMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
       <JurnalMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
