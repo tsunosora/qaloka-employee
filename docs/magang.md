@@ -493,8 +493,9 @@ Sengaja SEDERHANA: anak cukup tahu "hari ini KONTEN / PRODUKSI bersama siapa"; d
   /api/public/portal/<token>/magang/harian` (sesi portal; mode owner `?owner=1` boleh melihat, rute ini baca saja) — hanya jadwal anak
   sendiri: tanggal, keadaan, tugas, nama panggilan rekan, sendiri.
 - **Yang disembunyikan / dilipat dari anak** (data tetap untuk pembina): bagian terlipat **Detail lainnya** (bawaan TERTUTUP, isi baru
-  dipasang saat dibuka) berisi kartu *Pos kamu minggu ini* (pos, target, pos berikutnya), kartu *Jadwal Konten* (konten hari ini, brief,
-  daftar berikutnya/sebelumnya — tetap bisa diisi dari sana) dan kartu *Jadwal rotasi kamu*. Tetap terbuka seperti biasa: Jurnal harian,
+  dipasang saat dibuka) berisi kartu *Pos kamu minggu ini* (pos, target, pos berikutnya) dan kartu *Jadwal rotasi kamu*. Kartu *Jadwal Konten*
+  (konten hari ini, brief, platform, daftar berikutnya/sebelumnya, isian judul/link/status; mode owner baca saja) **dikeluarkan dari
+  lipatan** (10 Nov malam: anak tidak menemukannya) dan tampil tepat di bawah jadwal harian. Tetap terbuka seperti biasa: Jurnal harian,
   Side quest, Tugas mengingat (form & info "dibuka hari …"), Nilai dari pembimbing.
 - **Pantau guru**: bagian lipat **Tugas harian** di detail anak (rentang terpilih ∩ masa magang): per tanggal KONTEN/PRODUKSI + "bersama
   <panggilan>" / sendiri, LIBUR, TANGGAL MERAH (Minggu tidak ditampilkan). `serialHarianGuru` (tanpa catatan); tes kunci terlarang lulus.

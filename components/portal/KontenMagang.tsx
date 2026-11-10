@@ -553,7 +553,7 @@ function FormKonten({
         <Galat id={`${id}-judul-galat`} pesan={galat.judul} />
       </div>
       {medanTautan("linkFootage", "Link folder footage", footage, setFootage, refFootage)}
-      {medanTautan("linkEkspor", "Link ekspor konten", ekspor, setEkspor, refEkspor)}
+      {medanTautan("linkEkspor", "Link hasil kerja (ekspor konten)", ekspor, setEkspor, refEkspor)}
       <div>
         <label htmlFor={`${id}-status`} className="text-sm font-semibold text-fg">
           Status

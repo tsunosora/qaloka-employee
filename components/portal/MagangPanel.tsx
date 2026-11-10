@@ -83,9 +83,12 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
   const p = data.posIni;
   return (
     <div className="space-y-4">
-      {/* 14 Nov 2026: tab disederhanakan untuk anak — paling atas tugas harian; pos, jadwal konten & rotasi dilipat
+      {/* 14 Nov 2026: tab disederhanakan untuk anak — paling atas tugas harian lalu jadwal konten; pos & rotasi dilipat
           di "Detail lainnya" (data tetap untuk pembina). */}
       <HarianMagang token={token} q={q} />
+
+      {/* Jadwal konten dari pembina (brief + platform + isian hasil) tampil langsung, tidak dilipat. */}
+      <KontenMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
       <JurnalMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
@@ -199,8 +202,6 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
             <p className="text-sm text-muted">Minggu ini kamu belum dijadwalkan di pos mana pun. Tanyakan ke pembimbing.</p>
           )}
         </Card>
-
-        <KontenMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
         {data.jadwal.length > 0 && (
           <Card title="Jadwal rotasi kamu">
@@ -383,8 +384,7 @@ function FormTugas({
 }
 
 /**
- * Bagian terlipat "Detail lainnya" (bawaan tertutup): pos minggu ini, jadwal konten, jadwal rotasi. Isi baru dipasang
- * saat dibuka — jadwal konten tetap bisa diisi anak dari sini.
+ * Bagian terlipat "Detail lainnya" (bawaan tertutup): pos minggu ini, jadwal rotasi. Isi baru dipasang saat dibuka.
  */
 function DetailLainnya({ children }: { children: React.ReactNode }) {
   const [buka, setBuka] = useState(false);
@@ -398,7 +398,7 @@ function DetailLainnya({ children }: { children: React.ReactNode }) {
       >
         <span>
           <span className="block font-display text-base font-bold text-fg">Detail lainnya</span>
-          <span className="block text-sm text-muted">Pos minggu ini, jadwal konten, jadwal rotasi</span>
+          <span className="block text-sm text-muted">Pos minggu ini, jadwal rotasi</span>
         </span>
         <IconChevronDown aria-hidden="true" className={`shrink-0 text-[20px] text-muted transition-transform ${buka ? "rotate-180" : ""}`} />
       </button>
