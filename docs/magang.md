@@ -361,3 +361,16 @@ LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tia
   anak+grup / trim tetap sama).
 - **Deploy** `tools/magang/deploy-fix-konten-patch-voliko.sh <SHA>` (ff-only dari `469adf6`, tanpa migrasi — batal bila `prisma/`
   berubah; potret JSON kolom teks MagangKonten sebelum & sesudah, exit 2 bila ada kolom berisi yang menjadi kosong).
+
+### Deploy perbaikan Voliko 10 Nov 2026 17.49 (izin Faisal)
+
+- `~/web/rate-my-staff` `469adf6` → **`3d74d30`** (`fix/magang-konten-patch`, ff-only, `setsid nohup` `~/alat/deploy-rms-fix-konten-patch-20261110.sh` + `.log`;
+  cadangan `~/cadangan/deploy-rms-20261110-174915` 61 tabel + .env + storage + `konten-teks-{sebelum,sesudah}.json`). Tanpa migrasi; lockfile sama;
+  restart `ratemystaff` saja. Galat baru 0.
+- Jepretan sebelum = sesudah (`~/alat/jepret-konten-20261110.sh`): 24 baris konten (checksum semua kolom), warna konsep pink/lavender/putih/merah,
+  grup 2/2/3, brief (MD5), absensi/jurnal/penugasan.
+- **Uji PATCH parsial di produksi** (`~/alat/uji-patch-parsial-20261110.sh` + `.log`, API admin): baris #1 (2 Nov) `{catatan}` → `{statusId:2}` →
+  `{usulan:false}`: catatan tetap; dikembalikan `{statusId:1, catatan:null}` → semua kolom isi = awal (efek samping: `updatedAt` &
+  `diubahOlehId` baris #1 kini akun admin). Konsep #1 `{referensi: sama}` (jalur panel brief) → warna tetap pink. Pembina aman menyunting sel
+  & menyimpan Catatan & Brief.
+- Skrip pemulihan TIDAK dijalankan (tidak ada data hilang).
