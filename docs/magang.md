@@ -453,7 +453,7 @@ jadwal kini milik SATU **platform**; tiap platform punya jadwal, brief, dan gili
   (login) 200 dengan sidebar baru (nav `overflow-y-auto`, `h-dvh`). /login /me /absen /pantau normal. Fingerspot terakhir 20.25 (pra-deploy),
   webhook hidup.
 
-## Jadwal harian berpasangan (feat/magang-jadwal-harian — BELUM dideploy)
+## Jadwal harian berpasangan (feat/magang-jadwal-harian — terdeploy ke Voliko 10 Nov 21.27)
 
 Sengaja SEDERHANA: anak cukup tahu "hari ini KONTEN / PRODUKSI bersama siapa"; detailnya dijelaskan pembina.
 
@@ -512,3 +512,17 @@ Sengaja SEDERHANA: anak cukup tahu "hari ini KONTEN / PRODUKSI bersama siapa"; d
   sendiri, di luar masa / nonaktif, satu-pasangan-aktif, validasi (PATCH tanpa kunci tambahan), grid + teks WA, data Voliko 10–16 Nov,
   rencana skrip idempoten, nama asli hanya di berkas data, bentuk migrasi, serializer anak/guru tanpa catatan. Tangkapan (data fiktif):
   `.tangkapan/harian-*.png`.
+
+### Deploy Voliko 10 Nov 2026 21.26–21.27 + pasangan (izin Faisal)
+
+- Sebelumnya 20.44: absen HP **Wafiq** (peserta #8, employee 40; disetujui 10 Nov 09.20, mulai 9 Nov — tetap, keputusan Faisal) dinyalakan lewat
+  `PATCH /api/absen-hp/karyawan/40` (`~/alat/nyalakan-absen-hp-wafiq-20261110.sh` + `.log`, cadangan `~/cadangan/absen-hp-wafiq-20261110-204434/`).
+- `~/web/rate-my-staff` `5231969` → **`527372b`** (ff-only, `setsid nohup` `~/alat/deploy-rms-jadwal-harian-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-212636` 62 tabel + .env + storage + jepret teks konten). Lockfile sama; migrasi `20261114000000_magang_jadwal_harian`;
+  restart `ratemystaff` saja; galat baru 0. Tabel Holiday Nov–Des kosong → pola tidak bergeser.
+- `tools/magang/voliko-jadwal-harian.ts` dry-run → `--jalankan` (cadangan `~/cadangan/magang-harian-20261110-212754/`): Aqila & Putra (KONTEN),
+  Rizki & Marisa (KONTEN), Cerry & WAFIQ (PRODUKSI), Yufita & Alif (PRODUKSI), patokan 10 Nov; ulang → 0.
+- Verifikasi (`~/alat/verifikasi-jadwal-harian-20261110.sh` + `.log`): kartu /me 8 anak benar untuk 10 & 11 Nov; `/magang/harian` 200; teks WA
+  minggu 16 Nov benar; jepretan konten 5 platform/konsep/grup/kode/absensi/jurnal/rotasi sama; /login /absen /pantau normal; Fingerspot 20 scan.
+- Catatan: Wafiq belum punya absensi sama sekali (9 & 10 Nov) → hari itu terhitung tidak hadir; koreksi lewat dasbor **Absensi → input
+  manual** (`/api/attendance/manual`) atau pengajuan izin — tidak dibuat otomatis.
