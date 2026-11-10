@@ -277,7 +277,7 @@ Guru pembimbing dari sekolah memantau anak sekolahnya sendiri lewat tautan + PIN
   jurnal, absensi 9 Nov (Fingerspot 22, HP 8) identik; MagangPantau = 0 (tautan guru dibuat Faisal sendiri). Webhook Fingerspot hidup
   (GET 405); deploy tengah malam → scan baru belum ada, cek pagi.
 
-## Jadwal konten (feat/magang-jadwal-konten — BELUM dideploy)
+## Jadwal konten (feat/magang-jadwal-konten — terdeploy ke Voliko 10 Nov 16.13)
 
 Meniru sheet pembina konten (kolom NO, TANGGAL, JUDUL POSTINGAN, KLASIFIKASI KONSEP, REF, STATUS, CODE, NAMA PKL, CAPTION,
 LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tiap Minggu; panel kiri catatan & brief).
@@ -319,3 +319,17 @@ LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tia
   restart `ratemystaff` saja; hitungan MagangKonten* sesudah = konten 0, status 4). Impor data = langkah terpisah sesudahnya.
 - Tes: `magang-konten` (generator meniru November pembina, usulan 7 anak, pemisah Minggu, tautan, cakupan & izin anak, brief, rute),
   `magang-konten-impor` (konsistensi data, 24 baris Senin–Sabtu, nama asli hanya di berkas data).
+
+### Deploy Voliko 10 Nov 2026 16.12–16.13 + impor November (izin Faisal)
+
+- `~/web/rate-my-staff` `da81381` → **`469adf6`** (ff-only, `setsid nohup` `~/alat/deploy-rms-jadwal-konten-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-161207` 56 tabel 5,7 MB + .env + storage). Lockfile sama; migrasi `20261112000000_magang_jadwal_konten`;
+  restart `ratemystaff` saja. Hitungan magang/izin sebelum = sesudah (penugasan 93, jurnal 11, peserta 8); tidak ada galat baru.
+- Impor `tools/magang/voliko-jadwal-konten.ts`: dry-run (`~/alat/voliko-jadwal-konten-dryrun-20261110.log`) → `--jalankan`
+  (`~/alat/voliko-jadwal-konten-20261110.log`, cadangan `~/cadangan/magang-konten-20261110-161343/`): 4 konsep + 4 referensi IG, 3 grup
+  (A Yufita+Alif, B Marisa+Rizki, C Aqila+Cerry+Putra; 7 anggota), kode 1–7, brief (drive "1. VOLIKO PRINT" TANPA URL, catatan Xposer,
+  Rubik / Rubik-Bold, Outline black, caption + hashtag), **24 baris** 2–28 Nov (12 baris 16–28 Nov = USULAN). Ulang dry-run → 0 baris baru.
+- Verifikasi (`~/alat/verifikasi-jadwal-konten-20261110.sh` + `.log`, GET sesi portal 5 menit): /login /me /absen /pantau 200, API pantau palsu
+  404, `/magang/konten` → login; kartu konten: Rizki (kode 4) 5 jadwal termasuk hari ini 10 Nov, Yufita 5, Aqila 2; absensi hari ini
+  (Fingerspot 12, HP 11 — scan pagi sesudah deploy semalam MASUK), jurnal, rotasi identik.
+- Catatan: peserta ke-8 **WAFIQ** (SMK N 4, dibuat 10 Nov 09.20) belum punya kode konten & grup, absen HP belum menyala.
