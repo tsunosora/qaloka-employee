@@ -6,6 +6,9 @@ import { Modal } from "@/components/ui/Modal";
 import { IconDownload, IconPencil, IconCheck } from "@/components/ui/icons";
 
 type Row = {
+  /** Anak magang berjam khusus (lib/services/attendance/jam-magang.ts). */
+  jamKerja?: { masuk: string; pulang: string; toleransiMenit: number };
+  pulangAwalMinutes?: number;
   employeeId: number;
   date: string;
   clockIn: string | null;
@@ -284,7 +287,15 @@ export default function AttendanceReportPage() {
                     <td className="px-4 py-3 tabular text-muted">{r.clockOut ?? "—"}</td>
                     <td className="px-4 py-3 tabular text-muted">{r.lateMinutes ? `${r.lateMinutes}m` : "—"}</td>
                     <td className="px-4 py-3 tabular text-muted">{r.overtimeMinutes ? `${r.overtimeMinutes}m` : "—"}</td>
-                    <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={r.status} />
+                      {r.jamKerja && (
+                        <div className="tabular mt-0.5 text-[11px] text-subtle">
+                          Jam magang {r.jamKerja.masuk.replace(":", ".")}–{r.jamKerja.pulang.replace(":", ".")}
+                          {(r.pulangAwalMinutes ?? 0) > 0 && ` · pulang ${r.pulangAwalMinutes}m lebih awal`}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => openEditRow(r)} className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-2.5 py-1.5 text-xs text-muted transition hover:border-primary hover:text-primary">
                         <IconPencil className="text-[14px]" /> Edit

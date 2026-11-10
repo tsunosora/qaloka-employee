@@ -240,3 +240,387 @@ yang dikerjakan sepanjang magang. Kewajiban foto & video tiap produk jadi tetap 
   (raw) bila keluaran dijadikan JSON.
 - Verifikasi API (`~/alat/verifikasi-7anak-20261109.log`, sesi portal 5 menit, GET): 7 anak posIni Orientasi, berikut = jadwal 16 Nov,
   19 misi tampil (side quest otomatis), /me 200; Bimbingan Faisal = Orientasi + 4 pos utama.
+
+## Pantauan guru sekolah (feat/magang-pantau-guru — terdeploy ke Voliko 10 Nov 00.46)
+
+Guru pembimbing dari sekolah memantau anak sekolahnya sendiri lewat tautan + PIN, **hanya melihat**.
+
+- **Model** `MagangPantau` (migrasi `20261111000000_magang_pantau_guru`, hanya MENAMBAH satu tabel): `sekolahKunci`
+  (= `kunciSekolah()`), `sekolahLabel`, `token` unik (32 bita acak base64url), `pinHash` (bcrypt, PIN 6–8 angka dari admin),
+  `aktif`, `kedaluwarsa` (opsional, berlaku s.d. akhir hari itu), `tampilLampiranIzin` (bawaan mati), `terakhirDibukaAt`,
+  `dibukaKali`, `dicabutAt`, `dibuatOlehId` (User, SetNull). Kolom tambahan `kunciAktif` (unik; = sekolahKunci selama aktif,
+  NULL sesudah dicabut) menjamin **satu tautan aktif per sekolah** di tingkat DB.
+- **Admin** Magang → **Sekolah** (`/magang/sekolah`, `requireManager`): sekolah dari semua peserta (aktif & nonaktif) dikelompokkan
+  `daftarSekolah()` — jumlah anak, rentang mulai–selesai, nama guru pembimbing, *Cetak rapor sekolah*. Panel tautan: buat (PIN
+  ditampilkan sekali, kedaluwarsa terisi tanggal selesai terakhir, centang lampiran), salin tautan, dibuka N× / terakhir, ubah tanggal,
+  nyalakan/matikan lampiran, ganti PIN, **ganti tautan** (cabut + buat baru, PIN tetap), **cabut**. API: `GET/POST /api/magang/pantau`,
+  `PATCH /api/magang/pantau/[id] {pin?, kedaluwarsa?, tampilLampiranIzin?}`, `POST …/[id]/cabut`, `POST …/[id]/ganti {pin?}`.
+  pinHash tidak pernah dikirim; token penuh hanya ke manajer.
+- **Guru** `/pantau/<token>` (bebas login di `proxy.ts`; lisensi `hr.assessment`): layar PIN → kepala (sekolah + nama usaha) →
+  saringan tanggal (bawaan awal magang → hari ini; *Semua / Minggu ini / Bulan ini* / tanggal bebas) → kartu anak (pos minggu ini +
+  lokasi, kehadiran %, jurnal x/y, side quest x/y) → detail (`#anak-<id>`, tombol Kembali peramban bekerja) dengan bagian terlipat:
+  Ringkasan (+ nilai per pos), Absensi (masuk/pulang, status, sumber HP/Mesin; HP: nama lokasi + jarak + foto), Jurnal (+ komentar
+  pembimbing, foto), Izin & sakit (lampiran hanya bila diizinkan), Pos & jadwal, Tugas mengingat (nilai, predikat, terlambat, catatan
+  pembimbing — BUKAN tulisan/jawaban kuis anak), Side quest (per kategori + judul misi disetujui, TANPA poin). Foto → lightbox.
+  *Cetak rekap anak* / *Cetak rekap sekolah* (satu anak per halaman, terang, tanpa foto) → simpan PDF lewat peramban.
+- **Rute publik** `/api/public/pantau/<token>`: `GET` (status), `POST masuk {pin}`, `POST keluar`, `GET anak?dari&sampai`,
+  `GET anak/[id]?dari&sampai`, berkas `anak/[id]/absen-foto/[buktiId]`, `anak/[id]/jurnal/[jurnalId]/foto/[n]`,
+  `anak/[id]/izin/[izinId]/lampiran/[lampiranId]`. Halaman `/pantau/<token>` selalu 200 (token tak berlaku → layar "Tautan tidak berlaku").
+- **Kehadiran %** (`pantau.ts hariKerjaAnak/hitungKehadiran`): hari kerja dari max(dari, mulai) s.d. min(sampai, hari ini, selesai),
+  Senin–Sabtu tanpa Holiday (aturan rapor/jurnal); hari sebelum mulai tidak dihitung; hari ini yang belum ada absen/izin belum dihitung;
+  absen di hari Minggu/libur ditampilkan "hadir (tidak dihitung)". Status per hari dari `aggregateAttendance` (laporan yang sama dengan
+  dasbor); karyawan nonaktif → dari scan mentah. Rekap dasbor admin tidak berubah.
+- **Keamanan**
+  - Token tak dikenal / dicabut / kedaluwarsa → 404 dengan pesan SAMA ("Tautan tidak berlaku. Minta tautan baru ke admin.").
+  - Cookie `rms_pantau` HttpOnly, SameSite=Lax, Secure di produksi, Path=/, 8 jam, HMAC(AUTH_SECRET) atas `{id, sidik token, sidik
+    pinHash, exp}`. Tiap permintaan memeriksa ulang DB: aktif, tidak dicabut, tidak kedaluwarsa, sidik token & PIN cocok → cabut /
+    ganti tautan / ganti PIN langsung mematikan sesi lama. Satu cookie per peramban (dua sekolah di peramban yang sama saling menimpa).
+  - Penahan PIN di **memori proses** (seperti `lib/rate-limit.ts`; hilang saat restart, cukup untuk satu instalasi PM2): 5 salah per
+    token+IP → 15 menit, plus batas 20 salah per token dari semua IP.
+  - Cakupan: anak = `sekolahSama(peserta.sekolah, sekolahKunci)` DAN karyawan tidak dihapus; id anak sekolah lain → 404; berkas
+    diperiksa milik anak itu → 404. Respons: `Cache-Control: no-store, private`, `X-Robots-Tag: noindex`, `nosniff`; halaman
+    `robots noindex`. Masuk/keluar boleh saat lisensi hanya-baca (seperti sesi portal).
+  - TIDAK pernah dikirim ke guru: nomor HP, publicToken, PIN/portalPin, kode karyawan/PIN mesin, gaji/upah, poin, karyawan lain,
+    catatan internal peserta, kontak guru, koordinat/perangkat/akurasi absen HP. Serializer menyusun objek baru dari medan yang diizinkan.
+- **Tes**: `tests/magang-pantau.test.ts` (cakupan antarsekolah & varian nama, tautan dicabut/kedaluwarsa/ganti, cookie token/PIN lama,
+  penahan PIN, kehadiran tanpa hari sebelum mulai/Minggu/libur, rute memeriksa sesi + cakupan, lisensi/proxy) dan
+  `tests/magang-pantau-serial.test.ts` (tidak ada kunci terlarang di JSON guru).
+- **Deploy**: `tools/magang/deploy-pantau-guru-voliko.sh <SHA>` (ff-only dari `abc2ee0`, cadangan DB+.env+storage, migrasi, build,
+  restart `ratemystaff` saja; hitungan data magang sebelum = sesudah; MagangPantau = 0; curl `/api/public/pantau/tidak-ada` → 404).
+
+### Deploy Voliko 10 Nov 2026 00.45–00.46 (izin Faisal)
+
+- `~/web/rate-my-staff` `abc2ee0` → **`da81381`** (ff-only, `setsid nohup` `~/alat/deploy-rms-pantau-guru-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-004531` 55 tabel 5,6 MB + .env + storage). Lockfile sama; migrasi `20261111000000_magang_pantau_guru`;
+  build OK (20 peringatan Turbopack); restart `ratemystaff` saja (restart 8; poller tak berubah, tak di-restart). `6dc0d91` TIDAK ikut.
+- Diperiksa: log galat kosong; /login, /me, /absen 200; `/pantau/<palsu>` 200 tanpa nama anak/sekolah, `X-Robots-Tag: noindex`,
+  `Cache-Control: no-store`; API `/api/public/pantau/<palsu>` (status, masuk PIN, anak, anak/1) → 404 "Tautan tidak berlaku…" sama semua;
+  halaman Magang → Sekolah ada di build (`/magang/sekolah` → login); hitungan magang/izin sebelum = sesudah; rotasi 7 anak (80 blok),
+  jurnal, absensi 9 Nov (Fingerspot 22, HP 8) identik; MagangPantau = 0 (tautan guru dibuat Faisal sendiri). Webhook Fingerspot hidup
+  (GET 405); deploy tengah malam → scan baru belum ada, cek pagi.
+
+## Jadwal konten (feat/magang-jadwal-konten — terdeploy ke Voliko 10 Nov 16.13)
+
+Meniru sheet pembina konten (kolom NO, TANGGAL, JUDUL POSTINGAN, KLASIFIKASI KONSEP, REF, STATUS, CODE, NAMA PKL, CAPTION,
+LINK FOLDER FOOTAGE, LINK EKSPOR KONTEN; baris Senin–Sabtu, pemisah kuning tiap Minggu; panel kiri catatan & brief).
+
+- **Model** (migrasi `20261112000000_magang_jadwal_konten`, hanya MENAMBAH: 5 tabel + `MagangPeserta.kodeKonten` nullable unik;
+  4 status bawaan `INSERT IGNORE`): `MagangKontenKonsep` (`kunci` tetap, `nama` + `sub` → "ENTERTAIMENT (SITKOM)" — ejaan pembina
+  disimpan apa adanya, `warna` = kunci palet/hex, `referensi` [{label,url}]), `MagangKontenStatus` (`anakBoleh` = anak boleh memilih,
+  `final` = dihitung selesai & hanya pembina; bawaan Belum take / Sudah take / Editing / Selesai-Diposting), `MagangKontenGrup` +
+  `MagangKontenGrupAnggota` (terpisah dari tim rotasi; `urutan` = giliran hari grup), `MagangKonten` (satu baris = satu konten:
+  anak ATAU grup ATAU belum dibagi, `usulan`, `urutan` untuk >1 baris/hari, `selesaiAt` diisi saat status final, pengubah akun/karyawan).
+  Catatan & brief = Setting `magang_konten_brief` (JSON drive/catatan/font/preset/caption/hashtag, zod `briefSchema`); pola hari =
+  Setting `magang_konten_pola` (bawaan Sen SITKOM, Sel FLEXING, Rab SITKOM, Kam FLEXING, Jum TALK, Sab FLEXING, EMPATHY tiap 14 hari).
+- **Dasbor** Magang → **Jadwal Konten** (`/magang/konten?bulan=YYYY-MM`, `requireManager`): tabel padat (kepala & kolom NO/TANGGAL
+  lengket, gulir ke samping), sunting di sel (Enter/keluar = simpan, Esc = batal; tampil seketika, dibatalkan bila server menolak),
+  pilihan konsep/status/CODE ("1 · panggilan", "GRUB A") berupa daftar berwarna + teks, tautan sebagai chip (`noopener`), NAMA PKL dari
+  kode/anggota grup, tambah baris per tanggal, hapus (konfirmasi), saringan anak/grup/status, legenda kode & grup, lencana **Usulan** +
+  *Tandai disetujui* / *Setujui semua usulan*. Panel *Catatan & brief* (bawaan tampil di layar ≥1536 px; tombol tampil/sembunyi):
+  drive, note, font, preset, referensi per konsep, caption + hashtag dengan *Salin caption*. **Setelan**: konsep, status, grup + anggota,
+  kode anak (unik, tukar kode aman), pola hari.
+- **Generator** `susunBulan()` (`lib/services/magang/konten.ts`, *Buat jadwal bulan berikut* → pratinjau → simpan): Senin–Sabtu;
+  Minggu & Holiday dilewati tanpa memakan giliran; kode anak melanjutkan kode terakhir sebelum bulan itu (berputar); Sabtu yang jatuh
+  ≥ EMPATHY terakhir + selang → hari grup untuk grup berikutnya (hari grup tidak memakan giliran anak; Sabtu libur → Sabtu berikutnya;
+  tanpa riwayat → Sabtu kedua, grup pertama). Bawaan hanya mengisi tanggal kosong (tanggal terisi ikut memajukan giliran → tanpa
+  duplikat); *Ganti* menghapus baris yang BELUM dikerjakan saja (status awal, semua isian kosong). Baris baru: Belum take, usulan.
+- **HP anak** (`/me/<token>` tab Magang, kartu **Jadwal Konten** di bawah pos minggu ini): *Konten hari ini* + pengingat ("Hari ini jadwal
+  kontenmu — <note>"), konsep, catatan pembina, referensi, font/preset/drive, caption (*Salin caption*); anak mengisi judul, link footage,
+  link ekspor, dan status `anakBoleh`. Status final tampil "Divalidasi pembina" (terkunci). Daftar *Berikutnya* / *Sebelumnya* (4 minggu
+  ke belakang – 6 minggu ke depan). Rute `GET/PATCH /api/public/portal/<token>/magang/konten[/id]`: hanya baris kode sendiri / grupnya
+  (lainnya 404), mode owner baca saja (403), status final / bukan anakBoleh → 403, baris final → 409, tautan hanya http(s).
+- **Pantau guru**: detail anak menampilkan "Konten: x selesai dari y terjadwal" (hitungan saja, tanpa tautan).
+- **Impor Voliko** `tools/magang/voliko-jadwal-konten.ts` (data: `tools/magang/data/voliko-konten-nov2026.ts`): `TZ=Asia/Jakarta npx tsx
+  tools/magang/voliko-jadwal-konten.ts` = DRY RUN (cetak tabel), `--jalankan` = cadangan JSON (`--cadangan=`, bawaan
+  `~/cadangan/magang-konten-<waktu>`) lalu satu transaksi tanpa DDL. Batal bila migrasi belum ada / id+panggilan anak tidak cocok / kode
+  dipegang anak lain. Idempoten (konsep/status per kunci, grup per nama, kode hanya bila kosong/sama, brief hanya bila belum ada, baris
+  (tanggal, konsep, kode/grup) yang sama dilewati). Isi: kode 1–7, GRUB A/B/C, 4 konsep + referensi IG, brief (URL drive "1. VOLIKO
+  PRINT" BELUM diketahui → kosong), 2–14 Nov persis sheet, 16–28 Nov usulan dengan 3 anak baru. Senin 30 Nov tidak ada di sheet —
+  isi lewat *Buat jadwal* bulan November (isi tanggal kosong). Giliran grup sesudahnya: C (12 Des), A, B.
+- **Deploy** `tools/magang/deploy-jadwal-konten-voliko.sh <SHA>` (ff-only dari `da81381`, cadangan DB+.env+storage, migrasi, build,
+  restart `ratemystaff` saja; hitungan MagangKonten* sesudah = konten 0, status 4). Impor data = langkah terpisah sesudahnya.
+- Tes: `magang-konten` (generator meniru November pembina, usulan 7 anak, pemisah Minggu, tautan, cakupan & izin anak, brief, rute),
+  `magang-konten-impor` (konsistensi data, 24 baris Senin–Sabtu, nama asli hanya di berkas data).
+
+### Deploy Voliko 10 Nov 2026 16.12–16.13 + impor November (izin Faisal)
+
+- `~/web/rate-my-staff` `da81381` → **`469adf6`** (ff-only, `setsid nohup` `~/alat/deploy-rms-jadwal-konten-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-161207` 56 tabel 5,7 MB + .env + storage). Lockfile sama; migrasi `20261112000000_magang_jadwal_konten`;
+  restart `ratemystaff` saja. Hitungan magang/izin sebelum = sesudah (penugasan 93, jurnal 11, peserta 8); tidak ada galat baru.
+- Impor `tools/magang/voliko-jadwal-konten.ts`: dry-run (`~/alat/voliko-jadwal-konten-dryrun-20261110.log`) → `--jalankan`
+  (`~/alat/voliko-jadwal-konten-20261110.log`, cadangan `~/cadangan/magang-konten-20261110-161343/`): 4 konsep + 4 referensi IG, 3 grup
+  (A Yufita+Alif, B Marisa+Rizki, C Aqila+Cerry+Putra; 7 anggota), kode 1–7, brief (drive "1. VOLIKO PRINT" TANPA URL, catatan Xposer,
+  Rubik / Rubik-Bold, Outline black, caption + hashtag), **24 baris** 2–28 Nov (12 baris 16–28 Nov = USULAN). Ulang dry-run → 0 baris baru.
+- Verifikasi (`~/alat/verifikasi-jadwal-konten-20261110.sh` + `.log`, GET sesi portal 5 menit): /login /me /absen /pantau 200, API pantau palsu
+  404, `/magang/konten` → login; kartu konten: Rizki (kode 4) 5 jadwal termasuk hari ini 10 Nov, Yufita 5, Aqila 2; absensi hari ini
+  (Fingerspot 12, HP 11 — scan pagi sesudah deploy semalam MASUK), jurnal, rotasi identik.
+- Catatan: peserta ke-8 **WAFIQ** (SMK N 4, dibuat 10 Nov 09.20) belum punya kode konten & grup, absen HP belum menyala.
+
+### Perbaikan sunting sebagian (fix/magang-konten-patch)
+
+- **Sebab** (live sejak `469adf6`): skema PATCH Jadwal Konten memakai `teksOpsional`/`tautanOpsional`
+  (`.nullable().optional().transform(v => … : null)`), jadi kolom yang TIDAK dikirim menjadi `null`, lalu route menulis `{...d}`.
+  Sunting satu sel, ganti status/konsep/CODE, atau *Tandai disetujui* (`{usulan:false}`) mengosongkan judul, ref, caption,
+  link footage, link ekspor, dan catatan baris itu. Kartu HP anak (`ubahKontenAnakSchema`) punya pola yang sama, tetapi
+  klien selalu mengirim ketiga kolomnya (tidak terkena); *Setujui semua usulan* memakai `updateMany({usulan:false})` (aman).
+  Masalah kedua: di zod 4 `.default()` tetap terisi di dalam `.partial()` — `ubahKonsepSchema` dari panel *Catatan & brief*
+  (`PATCH {referensi}`) mengembalikan warna konsep ke "putih" dan aktif ke true; `ubahGrupKontenSchema` tanpa `anggota`
+  akan mengisi `[]` (= semua anggota grup dihapus); `ubahStatusKontenSchema` mengembalikan warna/aktif/anakBoleh/final.
+- **Perbaikan**: `teksParsial`/`tautanParsial` (`lib/validators/magang-konten.ts`): tidak dikirim = `undefined` (tidak ditulis),
+  `null`/`""` = dikosongkan. Skema ubah konten, konten anak, konsep, status, grup ditulis ulang tanpa `.default()`. Data update
+  PATCH pembina dibangun fungsi murni `dataUbahKonten()` (`lib/services/magang/konten.ts`): hanya kunci yang dikirim; memilih
+  anak mengosongkan grup (dan sebaliknya) hanya bila salah satunya dikirim terisi; `selesaiAt` hanya disentuh bila `statusId`
+  dikirim. Route konsep/status/grup/anak menulis `tanpaUndefined(parsed.data)`. Skema buat (POST) tidak berubah.
+- **Diaudit**: konten `[id]` / konsep / status / grup → diperbaiki; portal anak `konten/[id]` → diperbaiki (klien tidak terkena);
+  `kode` (PUT daftar, anak di luar daftar tak disentuh), `brief` & `pola` (PUT dokumen utuh; `PanelBrief`/`TabPola` selalu kirim
+  dokumen lengkap) → aman; `misi/kategori/[id]` (sudah `teksUbah`), `pantau/[id]` (cek `!== undefined`) → aman; formulir penuh
+  `pos/[id]`, `peserta/[id]`, `misi/[id]`, `soal/[id]` → aman (satu-satunya pemanggil, halaman Pos/Peserta/Side quest, selalu
+  mengirim objek lengkap termasuk lokasi, guruPembimbing, kontakGuru, aktif); aksi `jurnal/[id]`, `tugas/[id]`, `misi/kiriman/[id]`,
+  `pendaftaran/[id]`, `rotasi/[id]`, `setelan`, portal bimbingan → aman (isi aksi lengkap, bukan sunting sebagian).
+- **Tes** `tests/magang-konten-patch.test.ts` (18): `{statusId}` / `{usulan:false}` tanpa kolom teks; `dataUbahKonten` menjaga
+  kolom lain untuk statusId (final & bukan), konsepId, usulan, pesertaId, grupId, satu sel; `null`/`""` mengosongkan; skema anak;
+  konsep `{referensi}`, status `{nama}`, grup `{nama}` tanpa nilai bawaan. Terhadap skema lama: 14 gagal, 4 lulus (tolak tautan /
+  anak+grup / trim tetap sama).
+- **Deploy** `tools/magang/deploy-fix-konten-patch-voliko.sh <SHA>` (ff-only dari `469adf6`, tanpa migrasi — batal bila `prisma/`
+  berubah; potret JSON kolom teks MagangKonten sebelum & sesudah, exit 2 bila ada kolom berisi yang menjadi kosong).
+
+### Deploy perbaikan Voliko 10 Nov 2026 17.49 (izin Faisal)
+
+- `~/web/rate-my-staff` `469adf6` → **`3d74d30`** (`fix/magang-konten-patch`, ff-only, `setsid nohup` `~/alat/deploy-rms-fix-konten-patch-20261110.sh` + `.log`;
+  cadangan `~/cadangan/deploy-rms-20261110-174915` 61 tabel + .env + storage + `konten-teks-{sebelum,sesudah}.json`). Tanpa migrasi; lockfile sama;
+  restart `ratemystaff` saja. Galat baru 0.
+- Jepretan sebelum = sesudah (`~/alat/jepret-konten-20261110.sh`): 24 baris konten (checksum semua kolom), warna konsep pink/lavender/putih/merah,
+  grup 2/2/3, brief (MD5), absensi/jurnal/penugasan.
+- **Uji PATCH parsial di produksi** (`~/alat/uji-patch-parsial-20261110.sh` + `.log`, API admin): baris #1 (2 Nov) `{catatan}` → `{statusId:2}` →
+  `{usulan:false}`: catatan tetap; dikembalikan `{statusId:1, catatan:null}` → semua kolom isi = awal (efek samping: `updatedAt` &
+  `diubahOlehId` baris #1 kini akun admin). Konsep #1 `{referensi: sama}` (jalur panel brief) → warna tetap pink. Pembina aman menyunting sel
+  & menyimpan Catatan & Brief.
+- Skrip pemulihan TIDAK dijalankan (tidak ada data hilang).
+
+## Jadwal konten multi-platform & responsif (feat/magang-konten-platform — terdeploy ke Voliko 10 Nov 20.35)
+
+Satu tim magang membuat konten untuk beberapa akun/brand (Voliko Print, Exindo, Xposer, Epic Jogja, Voliko Sport). Tiap baris
+jadwal kini milik SATU **platform**; tiap platform punya jadwal, brief, dan giliran sendiri.
+
+- **Model** (migrasi `20261113000000_magang_konten_platform`, ditulis tangan): `MagangKontenPlatform` (`nama` ≤80, unik tanpa peduli huruf
+  besar — dicek di service; `kunci` slug unik TETAP (tidak ikut ganti nama); `warna` kunci palet seperti konsep; `ikon` opsional dari set SVG
+  kecil `IKON_PLATFORM` (instagram/tiktok/youtube/facebook/toko/web/kamera — hiasan, nama selalu tertulis); `brief` Json; `urutan`; `aktif` +
+  `diarsipkanAt`). `MagangKonten.platformId` Int NOT NULL, FK RESTRICT, indeks `(platformId, tanggal)`.
+- **Migrasi**: CREATE TABLE → `INSERT IGNORE` platform **Voliko Print** (`voliko-print`, urutan 1, aktif) → brief Setting `magang_konten_brief`
+  DISALIN ke brief Voliko Print (`UPDATE … WHERE brief IS NULL AND JSON_VALID`) → kolom `platformId` NULL → `UPDATE … SET platformId = Voliko
+  Print WHERE platformId IS NULL` → NOT NULL → indeks + FK. Tanpa DELETE/DROP. **Setting `magang_konten_brief` TIDAK dihapus** (cadangan; aplikasi
+  tidak membacanya lagi). Di instalasi non-Voliko platform pertama tetap bernama "Voliko Print" — ganti nama lewat Kelola platform (kunci tetap).
+- **Bukti** (MariaDB 10.4 lokal, DB sekali pakai, dihapus sesudahnya): (a) DB kosong + semua migrasi → `prisma migrate diff --from-url …
+  --to-schema-datamodel` = *No difference*; (b) DB di migrasi `20261112000000` diisi seperti produksi (24 baris, 4 konsep, 3 grup + 7 anggota,
+  brief dengan caption/hashtag/emoji/kutip) → migrasi → 24/24 baris `platformId` = Voliko Print, 0 tanpa platform, brief Voliko Print **identik
+  byte** dengan Setting (MD5 sama), checksum MD5 semua kolom lain MagangKonten (termasuk `updatedAt`) sebelum = sesudah, Setting tetap ada, diff
+  skema kosong; langkah data diulang manual → 0 baris berubah. (MySQL 8 menormalkan spasi JSON — isi sama, MD5 bisa beda.)
+- **Yang tetap GLOBAL** (paling sederhana; satu tim anak yang sama): konsep, status, grup + anggota, kode anak, pola hari. Referensi konsep:
+  `MagangKontenKonsep.referensi` = **bawaan semua platform**; brief platform boleh berisi `referensi: {"<konsepId>": [{label,url}]}` — daftar
+  TIDAK kosong menggantikan bawaan untuk platform itu (`referensiEfektif`), kosong = pakai bawaan. Bawaan diubah di Setelan → Konsep, khusus
+  platform di panel Catatan & brief.
+- **Generator per platform** (`susunRencana()` murni di `konten.ts`; `rencanaBulan(db, bulan, ganti, platformId)` hanya memuat baris platform
+  itu): *Buat jadwal bulan berikut* selalu untuk SATU platform. Tanggal terisi, kode anak terakhir sebelum bulan itu, dan EMPATHY terakhir
+  (giliran grup + irama 14 hari) dihitung **hanya dari baris platform itu** — platform lain tidak memengaruhi. Akibatnya anak yang sama bisa
+  mendapat jadwal di dua platform pada hari yang sama (memang diinginkan: tiap akun butuh konten harian). Platform baru tanpa riwayat: mulai
+  kode terkecil, hari grup Sabtu kedua grup pertama. *Ganti* hanya menghapus baris platform itu yang belum dikerjakan. Platform diarsipkan → 409.
+- **API** (`requireManager`): `GET/POST /api/magang/konten/platform` (POST: nama unik, kunci slug, urutan terakhir+1), `PATCH/DELETE
+  …/platform/[id]` (PATCH sebagian `ubahPlatformSchema` .strict() tanpa `.default()`, hanya nama/warna/ikon/urutan, route menulis
+  `tanpaUndefined`; DELETE → 409 `{message, dipakai}` bila punya baris), `PUT …/platform/urutan` `{urutan:[semua id]}`, `POST …/[id]/arsip`
+  (aktif=false + diarsipkanAt) & `…/[id]/buka-arsip`, `GET/PUT …/platform/[id]/brief` (dokumen utuh `briefPlatformSchema`; referensi hanya id
+  konsep yang ada, daftar kosong dibuang). `GET /api/magang/konten?bulan=&platform=<id|semua>` (tanpa `platform` → platform aktif pertama;
+  `semua` → brief null). `POST /api/magang/konten` & `/buat` wajib `platformId`; `PATCH [id]` boleh `platformId` (pindah platform);
+  `/setujui` boleh `platformId`. Rute lama `/api/magang/konten/brief` DIHAPUS (satu-satunya pemakai = panel brief, sudah pindah).
+- **Dasbor** `/magang/konten?bulan=&platform=`: tab platform (titik warna + ikon + nama; arsip disembunyikan kecuali *Tampilkan arsip*; tab
+  bergulir di HP, membungkus di ≥768) + **Semua platform** (kolom/lencana PLATFORM yang bisa diganti, *Buat jadwal* & tambah baris nonaktif
+  dengan keterangan). **Kelola platform**: tambah, ubah nama/warna/ikon (hanya kolom yang berubah dikirim), naik/turun, arsipkan/buka arsip,
+  hapus dua langkah → bila 409 ditawarkan **Arsipkan saja**. Panel Catatan & brief per platform terpilih.
+- **Responsif**: <768 px **kartu per hari** (`KartuKonten`: kepala tanggal + pemisah kuning tiap Minggu, kartu berisi konsep, status, CODE/grup
+  + nama, platform (di Semua), judul, referensi, footage, ekspor, caption, catatan, lencana Usulan + *Setujui*, *Tambah*, *Hapus* — penyunting
+  yang sama dengan tabel, sasaran ≥44 px, isian 16 px); 768–1279 tabel bergulir ke samping dengan NO+TANGGAL lengket, brief di **laci**
+  kanan (`Laci`: Esc/tirai/Tutup, fokus kembali); ≥1280 tata letak lama (brief di samping, bawaan tampil ≥1536). Saringan membungkus.
+- **HP anak**: tiap kartu/daftar berlabel platform; brief (catatan, font, preset, drive, caption+hashtag) diambil dari platform baris itu;
+  referensi konsep = khusus platform bila ada. Rute GET mengirim `brief` per id platform (tanpa referensi mentah).
+- **Pantau guru**: tetap hitungan saja — total + `perPlatform [{platform, terjadwal, selesai}]` (`serialKontenGuru`, tanpa judul/tautan/
+  catatan); tes kunci terlarang tetap lulus.
+- **Skrip**: `tools/magang/voliko-platform-konten.ts` (`TZ=Asia/Jakarta npx tsx …` = dry-run; `--jalankan` = cadangan JSON
+  `~/cadangan/magang-platform-<waktu>` lalu satu transaksi): batal bila migrasi belum ada / `voliko-print` tidak ada; buat Exindo, Xposer,
+  Epic Jogja, Voliko Sport (urutan 2–5, aktif, brief kosong, warna netral) dengan upsert per kunci (yang sudah ada TIDAK ditimpa; nama sama
+  beda kunci → dilewati); cetak jumlah baris Voliko Print (peringatan bila ≠ 24 / ada baris tanpa platform). Diuji: dry-run → jalankan (4 dibuat)
+  → ulang = 0. `tools/magang/voliko-jadwal-konten.ts` kini menulis baris & brief ke Voliko Print (cek dua migrasi; duplikat dicek per platform);
+  diuji di DB kosong: 24 baris + brief ke Voliko Print, ulang → 0 baris, tanpa peringatan brief.
+- **Deploy** `tools/magang/deploy-konten-platform-voliko.sh <SHA>` (ff-only dari `3d74d30`; satu-satunya berkas migrasi baru yang boleh =
+  `20261113000000_magang_konten_platform`; cadangan DB+.env+storage; potret kolom teks sebelum/sesudah (exit 2 bila ada yang kosong); **build
+  dulu, lalu migrasi, lalu restart** `ratemystaff` saja (jendela kode lama vs NOT NULL hanya detik); sesudahnya semua baris wajib punya platform
+  sah (exit 3) + hitungan per platform + MD5 brief). Skrip data platform = langkah terpisah sesudahnya.
+- **Tes** `tests/magang-konten-platform.test.ts`: bentuk SQL migrasi (INSERT IGNORE Voliko Print, UPDATE platformId WHERE NULL berurutan sebelum
+  NOT NULL/FK, salin brief bila NULL, tanpa DELETE/DROP), hapus 409 + arsip/buka arsip, urutan, nama unik, PATCH sebagian platform tidak
+  mengembalikan warna/ikon/urutan, `platformId` wajib, brief per platform (Setting lama & Json terbaca sama, referensi), generator per platform
+  (baris platform lain tidak mengubah giliran kode/grup/tanggal terisi; platform lain pakai riwayatnya; ganti per platform), label platform di
+  HP anak & ringkasan guru (tanpa bocor), rencana skrip data idempoten.
+- **Tangkapan** (data fiktif, `.tangkapan/platform-*.png`): 1366 tab & Semua platform, Kelola platform (hapus → tawaran arsip), 768 (tabel
+  bergulir, NO/TANGGAL lengket), 360 kartu / sunting judul di kartu / laci brief, HP anak berlabel platform.
+
+### Deploy Voliko 10 Nov 2026 20.34–20.35 + platform kosong (izin Faisal)
+
+- `~/web/rate-my-staff` `3d74d30` → **`5231969`** (ff-only, `setsid nohup` `~/alat/deploy-rms-konten-platform-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-203415` 61 tabel + .env + storage + jepret teks konten). Lockfile sama; build lalu migrasi
+  `20261113000000_magang_konten_platform`; restart `ratemystaff` saja; galat baru 0. Semua 24 baris → Voliko Print; tidak ada baris tanpa platform.
+- Jepretan sebelum = sesudah (`~/alat/jepret-konten-platform-20261110.sh`): konten (checksum semua kolom), warna konsep, grup 2/2/3, kode 1–7,
+  absensi/jurnal/penugasan. Brief Voliko Print = isi Setting lama (dibandingkan sebagai JSON); Setting lama dibiarkan sebagai cadangan.
+- `tools/magang/voliko-platform-konten.ts`: dry-run → `--jalankan` (cadangan `~/cadangan/magang-platform-20261110-203520/`): **Exindo, Xposer,
+  Epic Jogja, Voliko Sport** (urutan 2–5, kosong); ulang → 0 dibuat.
+- Uji parsial produksi (`~/alat/uji-patch-parsial-platform-20261110.log`): baris #1 catatan tetap saat ubah status/usulan, dikembalikan = awal;
+  konsep #1 warna tetap; platform #1 PATCH {nama} → warna/ikon/urutan/aktif tetap. API: 5 platform, Voliko Print 24 baris; `/magang/konten`
+  (login) 200 dengan sidebar baru (nav `overflow-y-auto`, `h-dvh`). /login /me /absen /pantau normal. Fingerspot terakhir 20.25 (pra-deploy),
+  webhook hidup.
+
+## Jadwal harian berpasangan (feat/magang-jadwal-harian — terdeploy ke Voliko 10 Nov 21.27)
+
+Sengaja SEDERHANA: anak cukup tahu "hari ini KONTEN / PRODUKSI bersama siapa"; detailnya dijelaskan pembina.
+
+- **Aturan** (`lib/services/magang/harian.ts`, murni): pasangan 2 anak (atau 1 = "sendiri") mengerjakan KONTEN atau PRODUKSI,
+  **bergantian tiap hari kerja** (Senin–Sabtu; Minggu & tanggal di tabel Holiday dilewati dan TIDAK membalik giliran). Patokan =
+  tanggal + tugas pada tanggal itu; tugas hari D = tugas patokan bila selisih hari kerja patokan→D genap, selain itu tugas satunya
+  (berlaku mundur juga; `selisihHariKerja` dihitung aritmetis − libur). Hanya dalam masa magang tiap anak (mulai..selesai) dan bila
+  peserta & karyawan aktif; di luar itu tidak ada tugas. Pasangan yang anggotanya tinggal satu (rekan belum ada / nonaktif / di luar
+  masa / libur sendiri / dipinjam pasangan lain) → anak tersisa tetap bertugas, ditandai **sendiri**. Satu anak paling banyak di
+  SATU pasangan aktif (`bentrokPasangan`, dicek di POST/PATCH pada gabungan data lama + kiriman → 422).
+- **Pengecualian per tanggal** (pembina): tingkat pasangan — ganti tugas hari itu / libur (+ catatan); tingkat anak — ganti pasangan
+  hari itu (`jenis "pasangan"`, rekan pengganti + tugas opsional; berlaku DUA ARAH, rekan lama masing-masing jadi sendiri; tugas =
+  tugas pengecualian → pola pasangan si anak → pola pasangan rekan), atau libur anak itu saja. Pengecualian **tidak menggeser giliran
+  hari-hari berikutnya** (giliran selalu dihitung dari patokan; diuji). POST mengganti pengecualian lama untuk sasaran yang sama di
+  tanggal itu (untuk ganti pasangan: juga milik rekan pengganti), satu transaksi tanpa DDL; bila tetap ada dua, id terbesar menang.
+- **Model** (migrasi `20261114000000_magang_jadwal_harian`, ditulis tangan, hanya MENAMBAH 2 tabel, tanpa data): `MagangPasangan`
+  (nama ≤80 opsional, pesertaAId, pesertaBId nullable = sendiri, patokanTanggal DateTime tengah malam WIB, patokanTugas
+  'konten'|'produksi', aktif, urutan) dan `MagangHarianPengecualian` (tanggal, pasanganId? / pesertaId?, jenis 'tugas'|'libur'|'pasangan',
+  tugas?, pasanganPesertaId?, catatan ≤200, dibuatOlehId User?; indeks tanggal). Bukti: DB kosong + semua migrasi → `prisma migrate diff
+  --from-url … --to-schema-datamodel` = *No difference*.
+- **API pembina** (`requireManager`): `GET /api/magang/harian?minggu=YYYY-MM-DD` (grid Senin–Sabtu × pasangan, pasangan, pengecualian,
+  libur, anak, teks WA), `GET …/harian/teks?minggu=`, `GET/POST …/harian/pasangan`, `PATCH/DELETE …/pasangan/[id]` (PATCH sebagian
+  `.strict()` tanpa `.default()`, route menulis `tanpaUndefined`), `POST …/harian/pengecualian`, `PATCH/DELETE …/pengecualian/[id]`
+  (PATCH hanya tugas/rekan/catatan).
+- **Dasbor** Magang → **Jadwal Harian** (`/magang/harian?minggu=`): tabel tanggal × pasangan dengan lencana besar KONTEN (ungu, ikon
+  kamera) / PRODUKSI (oranye, ikon kardus) / LIBUR — selalu teks + ikon, token `--konten`/`--produksi` (gelap, terang, cetak); minggu
+  sebelumnya/berikutnya/minggu ini, hari ini disorot, tanggal merah tertulis, pensil = diubah pembina, penyimpangan per anak di bawah
+  lencana ("X: bersama Y", "sendiri", "libur"). Klik kotak → dialog: KONTEN/PRODUKSI/LIBUR hari ini + catatan, *Kembalikan ke pola*, ubah
+  satu anak (kerja bersama anak lain + tugas, atau libur sendiri), hapus perubahan anak. **Kelola pasangan**: pilih 2 anak (anak 2 boleh
+  kosong = sendiri), nama opsional, tanggal patokan + tugasnya, urutan, aktif; peringatan bila anak sudah di pasangan aktif lain; ubah =
+  hanya kolom yang berubah; hapus dua langkah (saran: hilangkan centang Aktif). **Salin untuk WA** ("Senin 16 Nov — Konten: A & B, C & D ·
+  Produksi: E & F, G & H"; tanggal merah "— Libur (nama)"; "· Libur: X"; "(sendiri)") + *Lihat teks*; **Cetak** = tabel (terang). <768 px
+  kartu per hari.
+- **HP anak** (`/me/<token>` tab Magang): kartu PALING ATAS "Hari ini · Selasa 10 Nov — KONTEN bersama <rekan>" (atau PRODUKSI, LIBUR,
+  "Hari Minggu — libur", "Tanggal merah — libur", "Di luar masa magang", "Belum ada jadwal — tanya pembina") + baris hari kerja berikutnya
+  ("Besok (Rabu 11 Nov): …", atau nama hari bila bukan besok). Tidak ada isi lain; catatan pembina TIDAK dikirim. Rute `GET
+  /api/public/portal/<token>/magang/harian` (sesi portal; mode owner `?owner=1` boleh melihat, rute ini baca saja) — hanya jadwal anak
+  sendiri: tanggal, keadaan, tugas, nama panggilan rekan, sendiri.
+- **Yang disembunyikan / dilipat dari anak** (data tetap untuk pembina): bagian terlipat **Detail lainnya** (bawaan TERTUTUP, isi baru
+  dipasang saat dibuka) berisi kartu *Pos kamu minggu ini* (pos, target, pos berikutnya) dan kartu *Jadwal rotasi kamu*. Kartu *Jadwal Konten*
+  (konten hari ini, brief, platform, daftar berikutnya/sebelumnya, isian judul/link/status; mode owner baca saja) **dikeluarkan dari
+  lipatan** (10 Nov malam: anak tidak menemukannya) dan tampil tepat di bawah jadwal harian. Tetap terbuka seperti biasa: Jurnal harian,
+  Side quest, Tugas mengingat (form & info "dibuka hari …"), Nilai dari pembimbing.
+- **Pantau guru**: bagian lipat **Tugas harian** di detail anak (rentang terpilih ∩ masa magang): per tanggal KONTEN/PRODUKSI + "bersama
+  <panggilan>" / sendiri, LIBUR, TANGGAL MERAH (Minggu tidak ditampilkan). `serialHarianGuru` (tanpa catatan); tes kunci terlarang lulus.
+- **Skrip data** `tools/magang/voliko-jadwal-harian.ts` (data `tools/magang/data/voliko-pasangan.ts`: 4 pasangan, patokan Selasa 10 Nov
+  2026, dua KONTEN + dua PRODUKSI): `TZ=Asia/Jakarta npx tsx …` = DRY RUN (cek peserta, rencana, grid 10–30 Nov); `--jalankan` = cadangan
+  JSON (`~/cadangan/magang-harian-<waktu>`) lalu satu transaksi tanpa DDL. Batal bila migrasi belum ada / id peserta tidak ada / panggilan
+  tidak cocok (tanpa peduli huruf besar) / anak sudah di pasangan aktif lain. Idempoten per anggota: pasangan yang sudah ada TIDAK ditimpa
+  (beda patokan dilaporkan). Diuji di DB lokal: dry-run → jalankan (4 dibuat) → ulang = 0; DB tanpa migrasi → BATAL.
+- **Deploy** `tools/magang/deploy-jadwal-harian-voliko.sh <SHA>` (ff-only dari `5231969`, satu-satunya migrasi baru yang boleh =
+  `20261114000000_magang_jadwal_harian`, cadangan DB+.env+storage, penjaga konten tetap (potret teks exit 2, platform exit 3, hitungan per
+  platform sebelum = sesudah), build → migrasi → restart `ratemystaff` saja; tabel baru harus kosong (exit 4); curl halaman & API). Skrip
+  data pasangan = langkah terpisah sesudahnya.
+- **Tes** `tests/magang-harian.test.ts`: selisih hari kerja (vs hitung manual), bergantian lewat Minggu, libur tidak membalik, mundur dari
+  patokan, pengecualian tidak menggeser, libur pasangan/anak, ganti pasangan dua arah + rekan lama sendiri, terbaru menang, pasangan
+  sendiri, di luar masa / nonaktif, satu-pasangan-aktif, validasi (PATCH tanpa kunci tambahan), grid + teks WA, data Voliko 10–16 Nov,
+  rencana skrip idempoten, nama asli hanya di berkas data, bentuk migrasi, serializer anak/guru tanpa catatan. Tangkapan (data fiktif):
+  `.tangkapan/harian-*.png`.
+
+### Deploy Voliko 10 Nov 2026 21.26–21.27 + pasangan (izin Faisal)
+
+- Sebelumnya 20.44: absen HP **Wafiq** (peserta #8, employee 40; disetujui 10 Nov 09.20, mulai 9 Nov — tetap, keputusan Faisal) dinyalakan lewat
+  `PATCH /api/absen-hp/karyawan/40` (`~/alat/nyalakan-absen-hp-wafiq-20261110.sh` + `.log`, cadangan `~/cadangan/absen-hp-wafiq-20261110-204434/`).
+- `~/web/rate-my-staff` `5231969` → **`527372b`** (ff-only, `setsid nohup` `~/alat/deploy-rms-jadwal-harian-20261110.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-212636` 62 tabel + .env + storage + jepret teks konten). Lockfile sama; migrasi `20261114000000_magang_jadwal_harian`;
+  restart `ratemystaff` saja; galat baru 0. Tabel Holiday Nov–Des kosong → pola tidak bergeser.
+- `tools/magang/voliko-jadwal-harian.ts` dry-run → `--jalankan` (cadangan `~/cadangan/magang-harian-20261110-212754/`): Aqila & Putra (KONTEN),
+  Rizki & Marisa (KONTEN), Cerry & WAFIQ (PRODUKSI), Yufita & Alif (PRODUKSI), patokan 10 Nov; ulang → 0.
+- Verifikasi (`~/alat/verifikasi-jadwal-harian-20261110.sh` + `.log`): kartu /me 8 anak benar untuk 10 & 11 Nov; `/magang/harian` 200; teks WA
+  minggu 16 Nov benar; jepretan konten 5 platform/konsep/grup/kode/absensi/jurnal/rotasi sama; /login /absen /pantau normal; Fingerspot 20 scan.
+- Catatan: Wafiq belum punya absensi sama sekali (9 & 10 Nov) → hari itu terhitung tidak hadir; koreksi lewat dasbor **Absensi → input
+  manual** (`/api/attendance/manual`) atau pengajuan izin — tidak dibuat otomatis.
+
+## Jam kerja khusus magang (feat/magang-jam-kerja — KODE terdeploy ke Voliko 10 Nov 22.10; data jam BELUM)
+
+Anak dari sekolah berbeda punya jam berbeda (mis. SMK N 4 09.00–17.00, SMK Negeri 2 Sewon 08.00–16.00). Fitur **Jadwal Kerja**
+(WorkSchedule/roster) tidak cukup: di mode shift otomatis — yang selalu dipakai laporan, simpan status, input manual & impor —
+telat/lembur dihitung dari jam toko global (buka 08:00, akhir pagi 16:00, `shift_late_tolerance`) dan jadwal per-karyawan
+DIABAIKAN (disengaja, `tests/attendance-shift.test.ts`). Mengubah jam toko akan mengubah semua karyawan, jadi jam magang
+dibuat terpisah dan hanya berlaku untuk anak magang.
+
+- **Data** (migrasi `20261115000000_magang_jam_kerja`, ditulis tangan, hanya MENAMBAH): tabel `MagangJamSekolah`
+  (sekolahKunci = `kunciSekolah()` unik, sekolahLabel, jamMasuk/jamPulang "HH:MM", toleransiMenit null = umum) + 3 kolom NULL di
+  `MagangPeserta` (jamMasuk, jamPulang, toleransiMenit; null = ikut sekolah). Hari kerja tetap Senin–Sabtu (libur dari Holiday /
+  Minggu otomatis seperti biasa) — tidak ada kolom hari kerja. Tidak ada tanggal berlaku: perubahan jam berlaku untuk SEMUA hari
+  yang dihitung ulang.
+- **Urutan** (`lib/services/magang/jam-kerja.ts`, murni): kolom anak → jam sekolahnya (kunci tanpa peduli huruf besar/spasi) →
+  tidak ada (jam toko). Per kolom: jam masuk anak boleh diisi sendiri, jam pulang ikut sekolah. Toleransi anak → sekolah → umum.
+  Masuk ≥ pulang = diabaikan. Berlaku hanya untuk peserta `aktif` + karyawan aktif, pada tanggal di dalam masa magang
+  (mulai..selesai); di luar itu jam toko seperti karyawan biasa.
+- **Hitungan** (`lib/services/attendance/jam-magang.ts` → cabang `jamMagang` di `computeAttendanceRow`, menang atas shift otomatis
+  & jadwal per-karyawan; izin/tanpa scan tetap seperti biasa): telat = menit lewat jam masuk bila masuk SETELAH jam masuk +
+  toleransi (dihitung dari jam masuk, sama dengan aturan toko: 09:20 dengan 09:00/15 = telat 20; 09:05 = tepat waktu); **pulang
+  awal** = menit sebelum jam pulang (info saja, status tetap); **lembur** = menit lewat jam PULANG MAGANG (bukan lewat 16:00 — kalau
+  tidak, anak 09–17 selalu "lembur" 60 menit; struk/poin yang membaca lembur ikut angka ini). Tidak ada shift siang/longshift untuk
+  anak magang (shift dilaporkan "pagi"). Baris karyawan biasa tidak membawa kunci tambahan apa pun (`jamKerja`, `pulangAwalMinutes`
+  hanya ada di baris anak berjam khusus).
+- **Disambung di semua jalur** lewat `muatPetaJamMagang()` (`lib/services/magang/jam-kerja-db.ts`, dimuat SEKALI per permintaan,
+  Map karyawan → jam): `aggregateAttendance` (laporan & ekspor dasbor, portal /me Ringkasan/Absensi, pantau guru, struk, poin,
+  timesheet, ringkasan HR), `recomputeStoredStatus` (Fingerspot sync, absen HP, absen tim, jadwal shift, device-sync), input
+  manual, impor scanlog (status + saran jam yang hilang), daftar absensi tidak komplit (saran jam).
+- **Hitung ulang**: `recompute.ts` kini = inti murni `perubahanStatus()` + `rencanaStatusTersimpan()` (tanpa menulis) +
+  `terapkanPerubahan()`. Sesudah jam sekolah/anak disimpan, absensi tersimpan anak yang TERDAMPAK saja (anak sekolah itu / anak itu)
+  dihitung ulang dari tanggal mulai magangnya tapi paling jauh **62 hari** ke belakang (`hitungUlangPeserta`). Mengubah sekolah/
+  masa/aktif di form peserta juga menghitung ulang anak itu bila ia punya jam magang sebelum atau sesudah. Tanpa transaksi, tanpa DDL.
+  Baris lebih tua dari 62 hari tetap nilai lama sampai Fingerspot sync menghitung ulang (sync menghitung semua baris mesin).
+- **API** (`requireManager`): `GET /api/magang/jam` (sekolah + jamnya, peserta + jam efektif, toleransi umum, jam toko);
+  `PUT /api/magang/jam/sekolah` {sekolahKunci, jamMasuk, jamPulang, toleransiMenit?} (toleransi tidak dikirim = tetap; 404 bila
+  sekolah tidak ada di data peserta); `DELETE /api/magang/jam/sekolah?kunci=` (kembali ke jam toko); `PATCH /api/magang/jam/peserta/<id>`
+  (sebagian `.strict()`, hanya kunci yang dikirim ditulis, null = ikut sekolah; 422 bila jam gabungan tidak lengkap/terbalik). Semua
+  menerima `?pratinjau=1` → hanya menghitung dampak (baris berubah + hari terlambat sebelum → sesudah per anak), tidak menulis.
+- **Dasbor**: Magang → **Sekolah** tiap kartu punya bagian *Jam kerja anak magang* (jam masuk, jam pulang, toleransi opsional
+  "kosongkan = toleransi umum", *Simpan jam kerja*, *Cek dampak dulu*, *Hapus (kembali ke jam toko)*). Magang → **Peserta**: daftar
+  menulis "Jam kerja: 09.00–17.00 (jam sekolah / khusus anak ini / jam toko)"; form ubah punya *Jam khusus anak ini (opsional)*
+  (kosong = ikut sekolah, tombol *Kosongkan — ikut sekolah*; hanya kolom yang berubah dikirim). Laporan Absensi: baris anak magang
+  memuat "Jam magang 09.00–17.00 · pulang Xm lebih awal" di bawah status. Rapor: baris "Jam kerja: 09.00–17.00" di kop.
+- **Anak & guru**: /me Ringkasan + Absensi menampilkan kotak "Jam kerja magang 09.00–17.00 — Dihitung terlambat bila masuk lewat
+  09.15" dan "Pulang awal Xm" per hari; pantau guru: "Jam kerja …" di kartu Kehadiran + kotak yang sama di bagian Absensi +
+  "pulang X mnt lebih awal" per hari (`serialHariAbsen.pulangAwalMenit`, `detail.jamKerja`).
+- **Skrip data** `tools/magang/voliko-jam-kerja.ts` (data `tools/magang/data/voliko-jam-kerja.ts`: SMK N 4 Yogyakarta 09:00–17:00 →
+  peserta 5–8; SMK Negeri 2 Sewon 08:00–16:00 → peserta 1–4; toleransi umum): `TZ=Asia/Jakarta npx tsx …` = DRY RUN (rencana +
+  pratinjau per anak: baris berubah, hari terlambat sebelum → sesudah, dihitung di memori); `--jalankan` = cadangan JSON
+  (`~/cadangan/magang-jam-<waktu>`: MagangJamSekolah, kolom jam peserta, absensi anak) lalu buat jam sekolah + hitung ulang. Batal bila
+  migrasi belum ada / sekolah tidak ditemukan / id atau panggilan tidak cocok / anak tercatat di sekolah lain. Jam sekolah yang sudah
+  ada & beda dibiarkan (dilaporkan). Diuji di DB lokal (nama lengkap fiktif): dry-run → jalankan (2 dibuat, 64 baris anak SMK N 4
+  berubah, hari terlambat per anak 8 → 3; Sewon 0 berubah karena sama dengan jam toko) → ulang = 0; checksum absensi karyawan biasa
+  sama; DB tanpa migrasi / tanpa sekolah → BATAL.
+- **Deploy** `tools/magang/deploy-jam-kerja-voliko.sh <SHA>` (ff-only dari `527372b`, satu-satunya migrasi baru =
+  `20261115000000_magang_jam_kerja`, penjaga konten/platform seperti sebelumnya, jam baru harus kosong (exit 4), dan **jepretan absensi
+  karyawan biasa** (jumlah + checksum id/employeeId/scanDate/lateMinutes, scanDate < hari ini, bukan peserta) sebelum = sesudah, beda →
+  exit 5; `--jepret` untuk mengulang jepretan sesudah skrip data).
+- **Tes** `tests/magang-jam-kerja.test.ts`: 09:05/09:20/16:30/17:30, karyawan biasa identik (grid jam masuk × pulang, objek utuh, sama
+  dengan `computeShift`; jadwal per-karyawan & flexible tetap), urutan anak → sekolah → umum per kolom, toleransi, nonaktif/di luar masa,
+  kunci sekolah tanpa peduli huruf besar, batas 62 hari, PATCH sebagian, hitung ulang hanya baris anak, impor, rencana skrip idempoten,
+  nama asli hanya di berkas data, bentuk migrasi. Tangkapan (data fiktif): `.tangkapan/jam-*.png`.
+
+### Deploy Voliko 10 Nov 2026 22.09–22.10 (izin Faisal) — data jam DITAHAN
+
+- `~/web/rate-my-staff` `527372b` → **`d47000c`** (ff-only, `setsid nohup` `~/alat/deploy-rms-jam-kerja-20261111.sh` + `.log`; cadangan
+  `~/cadangan/deploy-rms-20261110-220906` 64 tabel + .env + storage). Lockfile sama; migrasi `20261115000000_magang_jam_kerja`; restart
+  `ratemystaff` saja; galat baru 0. Absensi karyawan biasa sebelum = sesudah (3625 baris, checksum sama); konten/jadwal harian/rotasi/jurnal utuh.
+- `tools/magang/voliko-jam-kerja.ts` **dry-run saja** (`~/alat/voliko-jam-kerja-dryrun-20261111.log`): SMK N 4 09:00–17:00 → Aqila/Cerry/Putra
+  terlambat 1 → 0 hari; SMK Negeri 2 Sewon 08:00–16:00 → Rizki/Yufita/Alif/Marisa 0 → 1 hari. Sebab: Senin 9 Nov absen HP baru menyala ±11.00,
+  mereka masuk 11.10–11.20; aturan lama membaca absen siang sebagai shift siang (tidak terlambat), aturan magang selalu shift pagi → terlambat
+  ±3 jam di hari pertama. **`--jalankan` ditahan menunggu keputusan Faisal.** Selama jam kosong, hitungan sama persis dengan sebelumnya.
+- Tempat mengubah jam: Magang → **Sekolah** (kartu sekolah → "Jam kerja anak magang", tombol "Cek dampak dulu") dan Magang → **Peserta** (ubah →
+  "Jam khusus anak ini").

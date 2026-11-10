@@ -1,5 +1,6 @@
 import { computeShift, type ShiftConfig, type ShiftKind } from "./shift";
 import { computeFlexible } from "./flexible";
+import { computeJamMagang, type JamMagangHari } from "./jam-magang";
 
 export type ScheduleInfo = {
   startTime: string | null;
@@ -25,6 +26,11 @@ export type DayInput = {
   scans: ScanInput[];
   /** Bila diisi, status/telat/lembur dihitung dari jam toko & shift (bukan jadwal per-karyawan). */
   shiftConfig?: ShiftConfig | null;
+  /**
+   * Jam kerja khusus anak magang hari itu (peserta aktif dalam masanya; lib/services/magang/jam-kerja.ts).
+   * Bila diisi, menang atas shiftConfig & jadwal per-karyawan. Karyawan biasa: tidak diisi / null → tak berubah.
+   */
+  jamMagang?: JamMagangHari | null;
 };
 
 export type ReportRow = {
@@ -46,6 +52,10 @@ export type ReportRow = {
   undertimeMinutes: number;
   /** Mode flexible: durasi kerja kotor (menit) — dipakai untuk lembur hari libur (semua jam). */
   workedMinutes: number;
+  /** Hanya baris anak magang berjam khusus: jam yang dipakai menghitung telat (untuk ditampilkan). */
+  jamKerja?: { masuk: string; pulang: string; toleransiMenit: number };
+  /** Hanya baris anak magang berjam khusus: menit pulang sebelum jam pulang (info, tidak mengubah status). */
+  pulangAwalMinutes?: number;
 };
 
 const ABSENCE_STATUSES = new Set(["Izin", "Sakit", "Cuti"]);
@@ -99,6 +109,10 @@ export function computeAttendanceRow(input: DayInput): ReportRow {
     mealEligible: false,
     undertimeMinutes: 0,
     workedMinutes: 0,
+    // Kunci tambahan HANYA untuk anak magang berjam khusus — baris karyawan biasa tetap berbentuk sama persis.
+    ...(input.jamMagang
+      ? { jamKerja: { masuk: input.jamMagang.jamMasuk, pulang: input.jamMagang.jamPulang, toleransiMenit: input.jamMagang.toleransiMenit } }
+      : {}),
   };
 
   // 1) Record ketidakhadiran eksplisit (Izin/Sakit/Cuti) menang.
@@ -135,6 +149,24 @@ export function computeAttendanceRow(input: DayInput): ReportRow {
 
   const clockIn = clockInDt ? fmt(clockInDt) : null;
   const clockOut = clockOutDt ? fmt(clockOutDt) : null;
+
+  // Anak magang berjam khusus: satu shift tetap jamMasuk–jamPulang (lib/services/attendance/jam-magang.ts).
+  if (input.jamMagang) {
+    const inMin = clockInDt ? minutesOfDay(clockInDt) : null;
+    const outMin = clockOutDt ? minutesOfDay(clockOutDt) : null;
+    const jm = computeJamMagang(inMin, outMin, input.jamMagang);
+    return {
+      ...base,
+      clockIn,
+      clockOut,
+      lateMinutes: jm.lateMinutes,
+      overtimeMinutes: jm.overtimeMinutes,
+      status: jm.status,
+      absenceReason: null,
+      shift: "pagi",
+      pulangAwalMinutes: jm.pulangAwalMinutes,
+    };
+  }
 
   // Mode "jam masuk bebas" (per-jadwal): lembur & uang makan dari DURASI kerja, bukan jam dinding.
   // Menang atas shiftConfig global agar toko flexible tak ikut aturan shift pagi/siang/longshift.

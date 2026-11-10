@@ -9,6 +9,7 @@ import { longDate } from "@/components/portal/ui";
 import { Judul, Kosong, Memuat, Pesan } from "@/components/magang/ui";
 import { Pendaftaran } from "@/components/magang/Pendaftaran";
 import { daftarSekolah, kunciSekolah, sekolahSama } from "@/lib/services/magang/sekolah";
+import { teksHitungUlang, type HitungUlang } from "@/components/magang/JamKerjaSekolah";
 
 type Peserta = {
   id: number;
@@ -24,6 +25,12 @@ type Peserta = {
   selesai: string | null;
   aktif: boolean;
   catatan: string | null;
+  /** Jam khusus anak ini ("HH:MM"; null = ikut sekolah). */
+  jamMasuk: string | null;
+  jamPulang: string | null;
+  toleransiMenit: number | null;
+  jamSekolah: { label: string; jamMasuk: string; jamPulang: string; toleransiMenit: number | null } | null;
+  jamEfektif: { label: string; sumber: "anak" | "sekolah"; toleransiMenit: number | null } | null;
 };
 type Payload = { peserta: Peserta[]; calon: { id: number; fullName: string; employeeCode: string }[] };
 type Form = {
@@ -42,6 +49,12 @@ type Form = {
   selesai: string;
   aktif: boolean;
   catatan: string;
+  /** Jam khusus anak ini (hanya saat mengubah). "" = ikut sekolah. */
+  jamMasuk: string;
+  jamPulang: string;
+  toleransi: string;
+  jamAwal?: { jamMasuk: string; jamPulang: string; toleransi: string };
+  jamSekolah?: Peserta["jamSekolah"];
 };
 
 /** Nilai saringan untuk peserta yang sekolahnya belum diisi. */
@@ -118,7 +131,16 @@ export default function PesertaMagangPage() {
           method: "PATCH",
           body: JSON.stringify({ ...umum, employeeId: Number(form.employeeId), aktif: form.aktif }),
         });
-        setNotice("Data peserta tersimpan.");
+        // Jam khusus: kirim HANYA kolom yang berubah (kosong = ikut sekolah → null).
+        const awal = form.jamAwal;
+        const ubahJam: Record<string, string | number | null> = {};
+        if (awal && form.jamMasuk !== awal.jamMasuk) ubahJam.jamMasuk = form.jamMasuk || null;
+        if (awal && form.jamPulang !== awal.jamPulang) ubahJam.jamPulang = form.jamPulang || null;
+        if (awal && form.toleransi !== awal.toleransi) ubahJam.toleransiMenit = form.toleransi.trim() === "" ? null : Number(form.toleransi);
+        if (Object.keys(ubahJam).length > 0) {
+          const r = await api<{ hitungUlang: HitungUlang }>(`/api/magang/jam/peserta/${form.id}`, { method: "PATCH", body: JSON.stringify(ubahJam) });
+          setNotice(`Data peserta & jam kerja tersimpan; ${teksHitungUlang(r.hitungUlang)}`);
+        } else setNotice("Data peserta tersimpan.");
       } else if (form.mode === "baru") {
         const r = await api<{ publicToken: string }>("/api/magang/peserta/baru", {
           method: "POST",
@@ -169,7 +191,7 @@ export default function PesertaMagangPage() {
                 jurusan: "",
                 guruPembimbing: "",
                 kontakGuru: "",
-                mulai, selesai: tigaBulan(mulai), aktif: true, catatan: "" });
+                mulai, selesai: tigaBulan(mulai), aktif: true, catatan: "", jamMasuk: "", jamPulang: "", toleransi: "" });
             }}
           >
             <IconPlus className="text-[16px]" /> Tambah peserta
@@ -223,6 +245,16 @@ export default function PesertaMagangPage() {
                       <p className="text-sm text-muted">
                         {[p.sekolah, p.jurusan].filter(Boolean).join(" · ") || "Sekolah belum diisi"} · {longDate(p.mulai)} – {p.selesai ? longDate(p.selesai) : "belum ditentukan"}
                       </p>
+                      <p className="tabular text-xs text-subtle">
+                        Jam kerja:{" "}
+                        {p.jamEfektif ? (
+                          <>
+                            <b className="text-fg">{p.jamEfektif.label}</b> {p.jamEfektif.sumber === "anak" ? "(khusus anak ini)" : "(jam sekolah)"}
+                          </>
+                        ) : (
+                          "jam toko (umum)"
+                        )}
+                      </p>
                       {p.guruPembimbing && (
                         <p className="text-xs text-subtle">
                           Guru pembimbing: {p.guruPembimbing}
@@ -258,6 +290,11 @@ export default function PesertaMagangPage() {
                             selesai: p.selesai ?? "",
                             aktif: p.aktif,
                             catatan: p.catatan ?? "",
+                            jamMasuk: p.jamMasuk ?? "",
+                            jamPulang: p.jamPulang ?? "",
+                            toleransi: p.toleransiMenit != null ? String(p.toleransiMenit) : "",
+                            jamAwal: { jamMasuk: p.jamMasuk ?? "", jamPulang: p.jamPulang ?? "", toleransi: p.toleransiMenit != null ? String(p.toleransiMenit) : "" },
+                            jamSekolah: p.jamSekolah,
                           })
                         }
                       >
@@ -377,6 +414,48 @@ export default function PesertaMagangPage() {
                 <input type="date" className="input mt-1.5" value={form.selesai} min={form.mulai} onChange={(e) => setForm({ ...form, selesai: e.target.value })} />
               </label>
             </div>
+            {form.id && (
+              <fieldset className="rounded-xl border border-border p-3">
+                <legend className="px-1 text-sm font-semibold text-fg">Jam khusus anak ini (opsional)</legend>
+                <p className="text-xs text-muted">
+                  Kosong = ikut sekolah:{" "}
+                  {form.jamSekolah ? (
+                    <b className="tabular text-fg">{form.jamSekolah.label}</b>
+                  ) : (
+                    "sekolahnya belum punya jam kerja (pakai jam toko) — atur di Magang → Sekolah"
+                  )}
+                  . Absensi tersimpan anak ini dihitung ulang sesudah disimpan.
+                </p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-fg">Jam masuk</span>
+                    <input type="time" className="input tabular mt-1.5 h-11" value={form.jamMasuk} onChange={(e) => setForm({ ...form, jamMasuk: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-semibold text-fg">Jam pulang</span>
+                    <input type="time" className="input tabular mt-1.5 h-11" value={form.jamPulang} onChange={(e) => setForm({ ...form, jamPulang: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm font-semibold text-fg">Toleransi (menit)</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={180}
+                      className="input tabular mt-1.5 h-11"
+                      value={form.toleransi}
+                      placeholder="ikut sekolah"
+                      onChange={(e) => setForm({ ...form, toleransi: e.target.value.replace(/[^\d]/g, "") })}
+                    />
+                  </label>
+                </div>
+                {(form.jamMasuk || form.jamPulang || form.toleransi) && (
+                  <button type="button" className="btn-ghost mt-2 h-11 px-3 text-xs" onClick={() => setForm({ ...form, jamMasuk: "", jamPulang: "", toleransi: "" })}>
+                    Kosongkan — ikut sekolah
+                  </button>
+                )}
+              </fieldset>
+            )}
             <label className="block">
               <span className="text-sm font-semibold text-fg">Catatan</span>
               <textarea className="input mt-1.5 min-h-20 py-2" value={form.catatan} maxLength={2000} onChange={(e) => setForm({ ...form, catatan: e.target.value })} />

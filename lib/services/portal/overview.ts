@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { awalHitung, potongSebelum } from "./awal-hitung";
 import { aggregateAttendance } from "@/lib/services/attendance/aggregate";
+import { labelJamKerja } from "@/lib/services/attendance/jam-magang";
 import { buildEmployeeReceipt } from "@/lib/services/attendance/receipt-source";
 import type { ReceiptData } from "@/lib/services/attendance/receipt";
 import type { ReceiptPeriod } from "@/lib/services/attendance/period";
@@ -35,6 +36,8 @@ export type PortalAttendanceRow = {
   workedMinutes: number;
   /** Hasil kerja hari itu dari PosPro; null bila tak dipetakan / tak ada data. */
   output: PosproDailyRow | null;
+  /** Hanya anak magang berjam khusus: menit pulang sebelum jam pulang magangnya. */
+  pulangAwalMinutes?: number;
 };
 
 export type PortalAttendanceSummary = {
@@ -101,6 +104,11 @@ export type PortalOverview = {
   discipline: DisciplineComparison;
   /** Total hasil kerja periode ini dari PosPro; null bila tak ada. */
   outputTotals: Omit<PosproDailyRow, "date"> | null;
+  /**
+   * Anak magang berjam khusus (mis. 09.00–17.00): jam yang dipakai menghitung telat di periode ini (hari terakhir yang
+   * memakainya). null = karyawan biasa / jam toko.
+   */
+  jamKerja?: { label: string; masuk: string; pulang: string; toleransiMenit: number } | null;
 };
 
 function ymd(d: Date): string {
@@ -200,7 +208,9 @@ export async function buildPortalOverview(
     absenceReason: r.absenceReason,
     workedMinutes: workedMinutesOf(r.clockIn, r.clockOut),
     output: outputByDate.get(r.date) ?? null,
+    ...(r.pulangAwalMinutes != null ? { pulangAwalMinutes: r.pulangAwalMinutes } : {}),
   }));
+  const jamTerakhir = [...attendance.rows].reverse().find((r) => r.jamKerja)?.jamKerja ?? null;
 
   const discipline = compareDiscipline(
     summarizeDiscipline(rows),
@@ -275,5 +285,6 @@ export async function buildPortalOverview(
     pospro,
     discipline,
     outputTotals: daily?.totals ?? null,
+    jamKerja: jamTerakhir ? { label: labelJamKerja(jamTerakhir.masuk, jamTerakhir.pulang), ...jamTerakhir } : null,
   };
 }

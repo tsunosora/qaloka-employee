@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/fetcher";
-import { IconAlert, IconCheck, IconX } from "@/components/ui/icons";
+import { IconAlert, IconCheck, IconChevronDown, IconX } from "@/components/ui/icons";
 import { Card, longDate, soft } from "@/components/portal/ui";
 import { tglPendek, warnaNilai } from "@/components/magang/ui";
 import { JurnalMagang } from "@/components/portal/JurnalMagang";
+import { KontenMagang } from "@/components/portal/KontenMagang";
+import { HarianMagang } from "@/components/portal/HarianMagang";
 import { SideQuestMagang } from "@/components/portal/SideQuestMagang";
 import { hitungBenar, predikat } from "@/lib/services/magang/nilai";
 
@@ -81,39 +83,12 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
   const p = data.posIni;
   return (
     <div className="space-y-4">
-      <Card title="Pos kamu minggu ini">
-        {p ? (
-          <div className="space-y-3">
-            <div>
-              <p className="font-display text-xl font-bold text-fg">{p.nama}</p>
-              <p className="text-sm text-muted">
-                Minggu {p.mingguKe} dari {p.dari}
-                {p.dari === 2 && (p.mingguKe === 1 ? " — perhatikan & tanya sebanyak-banyaknya" : " — saatnya mengerjakan sendiri")}
-                {p.pembimbing && <> · pembimbing {p.pembimbing}</>}
-              </p>
-            </div>
-            {poin(p.deskripsi).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Target yang harus kamu kuasai</p>
-                <ul className="mt-1.5 space-y-1 text-sm text-fg">
-                  {poin(p.deskripsi).map((x) => (
-                    <li key={x} className="flex gap-2">
-                      <IconCheck className="mt-0.5 shrink-0 text-primary" /> {x}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {data.posBerikut && (
-              <p className="border-t border-border pt-3 text-sm text-muted">
-                Berikutnya: <b className="text-fg">{data.posBerikut.nama}</b> mulai {longDate(data.posBerikut.mulai)}
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-muted">Minggu ini kamu belum dijadwalkan di pos mana pun. Tanyakan ke pembimbing.</p>
-        )}
-      </Card>
+      {/* 14 Nov 2026: tab disederhanakan untuk anak — paling atas tugas harian lalu jadwal konten; pos & rotasi dilipat
+          di "Detail lainnya" (data tetap untuk pembina). */}
+      <HarianMagang token={token} q={q} />
+
+      {/* Jadwal konten dari pembina (brief + platform + isian hasil) tampil langsung, tidak dilipat. */}
+      <KontenMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
       <JurnalMagang token={token} q={q} bolehKirim={!ownerQuery} />
 
@@ -193,23 +168,59 @@ export function MagangPanel({ token, ownerQuery }: { token: string; ownerQuery: 
         </Card>
       )}
 
-      {data.jadwal.length > 0 && (
-        <Card title="Jadwal rotasi kamu">
-          <ol className="space-y-1 text-sm">
-            {data.jadwal.map((j) => {
-              const sekarang = p && j.pos === p.nama && j.mulai <= data.hariIni;
-              return (
-                <li key={j.mulai} className={`flex justify-between gap-3 rounded-lg px-2 py-1 ${sekarang ? "bg-primary/10 font-semibold text-fg" : "text-muted"}`}>
-                  <span>{j.pos}</span>
-                  <span>
-                    {tglPendek(j.mulai)} · {j.minggu} mgg
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+      <DetailLainnya>
+        <Card title="Pos kamu minggu ini">
+          {p ? (
+            <div className="space-y-3">
+              <div>
+                <p className="font-display text-xl font-bold text-fg">{p.nama}</p>
+                <p className="text-sm text-muted">
+                  Minggu {p.mingguKe} dari {p.dari}
+                  {p.dari === 2 && (p.mingguKe === 1 ? " — perhatikan & tanya sebanyak-banyaknya" : " — saatnya mengerjakan sendiri")}
+                  {p.pembimbing && <> · pembimbing {p.pembimbing}</>}
+                </p>
+              </div>
+              {poin(p.deskripsi).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Target yang harus kamu kuasai</p>
+                  <ul className="mt-1.5 space-y-1 text-sm text-fg">
+                    {poin(p.deskripsi).map((x) => (
+                      <li key={x} className="flex gap-2">
+                        <IconCheck className="mt-0.5 shrink-0 text-primary" /> {x}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {data.posBerikut && (
+                <p className="border-t border-border pt-3 text-sm text-muted">
+                  Berikutnya: <b className="text-fg">{data.posBerikut.nama}</b> mulai {longDate(data.posBerikut.mulai)}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted">Minggu ini kamu belum dijadwalkan di pos mana pun. Tanyakan ke pembimbing.</p>
+          )}
         </Card>
-      )}
+
+        {data.jadwal.length > 0 && (
+          <Card title="Jadwal rotasi kamu">
+            <ol className="space-y-1 text-sm">
+              {data.jadwal.map((j) => {
+                const sekarang = p && j.pos === p.nama && j.mulai <= data.hariIni;
+                return (
+                  <li key={j.mulai} className={`flex justify-between gap-3 rounded-lg px-2 py-1 ${sekarang ? "bg-primary/10 font-semibold text-fg" : "text-muted"}`}>
+                    <span>{j.pos}</span>
+                    <span>
+                      {tglPendek(j.mulai)} · {j.minggu} mgg
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </Card>
+        )}
+      </DetailLainnya>
     </div>
   );
 }
@@ -369,5 +380,29 @@ function FormTugas({
         )}
       </div>
     </Card>
+  );
+}
+
+/**
+ * Bagian terlipat "Detail lainnya" (bawaan tertutup): pos minggu ini, jadwal rotasi. Isi baru dipasang saat dibuka.
+ */
+function DetailLainnya({ children }: { children: React.ReactNode }) {
+  const [buka, setBuka] = useState(false);
+  return (
+    <section className="space-y-4">
+      <button
+        type="button"
+        aria-expanded={buka}
+        onClick={() => setBuka(!buka)}
+        className="glass flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left"
+      >
+        <span>
+          <span className="block font-display text-base font-bold text-fg">Detail lainnya</span>
+          <span className="block text-sm text-muted">Pos minggu ini, jadwal rotasi</span>
+        </span>
+        <IconChevronDown aria-hidden="true" className={`shrink-0 text-[20px] text-muted transition-transform ${buka ? "rotate-180" : ""}`} />
+      </button>
+      {buka && <div className="space-y-4">{children}</div>}
+    </section>
   );
 }

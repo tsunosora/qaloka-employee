@@ -244,3 +244,25 @@ export const kirimMisiSchema = z.object({
 export const putusMisiSchema = z
   .object({ aksi: z.enum(["setujui", "tolak"]), catatan: teksOpsional(2000) })
   .refine((d) => d.aksi !== "tolak" || !!d.catatan, { message: "Tulis apa yang perlu diperbaiki", path: ["catatan"] });
+
+// ── Pantauan guru sekolah (11 Nov 2026) ──
+const pinPantau = z.string().trim().regex(/^\d{6,8}$/, "PIN harus 6–8 angka");
+
+export const buatPantauSchema = z.object({
+  sekolahKunci: z.string().trim().min(1, "Pilih sekolah").max(150),
+  pin: pinPantau,
+  kedaluwarsa: ymd.nullable().optional(),
+  tampilLampiranIzin: z.boolean().default(false),
+});
+
+export const ubahPantauSchema = z
+  .object({
+    pin: pinPantau.optional(),
+    kedaluwarsa: ymd.nullable().optional(),
+    tampilLampiranIzin: z.boolean().optional(),
+  })
+  .refine((d) => d.pin !== undefined || d.kedaluwarsa !== undefined || d.tampilLampiranIzin !== undefined, { message: "Tidak ada yang diubah" });
+
+export const gantiPantauSchema = z.object({ pin: pinPantau.optional() });
+
+export const masukPantauSchema = z.object({ pin: z.string().trim().min(1, "Masukkan PIN").max(20) });

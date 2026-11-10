@@ -59,19 +59,22 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  assessments         Assessment[]        @relation("Evaluator")
+  assessments         Assessment[]               @relation("Evaluator")
   auditLogs           AuditLog[]
   notifications       Notification[]
-  leaveDecisions      LeaveRequest[]      @relation("LeaveDecider")
-  redemptionDecisions PointRedemption[]   @relation("RedemptionDecider")
-  lemburDecisions     PengajuanLembur[]   @relation("LemburDecider")
-  reimburseDecisions  Reimbursement[]     @relation("ReimburseDecider")
-  absenHpDecisions    AbsenHpBukti[]      @relation("AbsenHpDecider")
-  absenTimDecisions   AbsenTimBaris[]     @relation("AbsenTimDecider")
-  rekapDecisions      RekapHarian[]       @relation("RekapDecider")
-  magangDinilai       MagangTugas[]       @relation("MagangPenilai")
-  magangJurnalDicek   MagangJurnal[]      @relation("MagangJurnalCek")
-  magangMisiDiputus   MagangMisiKiriman[] @relation("MagangMisiPutus")
+  leaveDecisions      LeaveRequest[]             @relation("LeaveDecider")
+  redemptionDecisions PointRedemption[]          @relation("RedemptionDecider")
+  lemburDecisions     PengajuanLembur[]          @relation("LemburDecider")
+  reimburseDecisions  Reimbursement[]            @relation("ReimburseDecider")
+  absenHpDecisions    AbsenHpBukti[]             @relation("AbsenHpDecider")
+  absenTimDecisions   AbsenTimBaris[]            @relation("AbsenTimDecider")
+  rekapDecisions      RekapHarian[]              @relation("RekapDecider")
+  magangDinilai       MagangTugas[]              @relation("MagangPenilai")
+  magangJurnalDicek   MagangJurnal[]             @relation("MagangJurnalCek")
+  magangMisiDiputus   MagangMisiKiriman[]        @relation("MagangMisiPutus")
+  magangPantauDibuat  MagangPantau[]             @relation("MagangPantauDibuat")
+  magangKontenDiubah  MagangKonten[]             @relation("MagangKontenDiubah")
+  magangHarianDibuat  MagangHarianPengecualian[] @relation("MagangHarianDibuat")
 }
 
 model Department {
@@ -198,6 +201,7 @@ model Employee {
   magangDinilai        MagangTugas[]          @relation("MagangPenilaiKaryawan")
   magangJurnalDicek    MagangJurnal[]         @relation("MagangJurnalCekKaryawan")
   magangMisiDiputus    MagangMisiKiriman[]    @relation("MagangMisiPutusKaryawan")
+  magangKontenDiubah   MagangKonten[]         @relation("MagangKontenDiubahKaryawan")
 
   @@index([isActive])
 }
@@ -485,8 +489,8 @@ model LeaveRequest {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  decidedBy User?    @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  employee  Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  decidedBy User?           @relation("LeaveDecider", fields: [decidedById], references: [id], onDelete: SetNull)
   lampiran  LeaveLampiran[]
 
   @@index([employeeId])
@@ -1068,14 +1072,27 @@ model MagangPeserta {
   selesai        DateTime?
   aktif          Boolean   @default(true)
   catatan        String?   @db.Text
+  // Kode anak di jadwal konten (kolom CODE di sheet pembina: 1, 2, 3 …) — diatur pembina, unik.
+  kodeKonten     Int?      @unique
+  // Jam kerja khusus anak ini (15 Nov 2026; "HH:MM"). null = ikut jam sekolahnya (MagangJamSekolah) → jam toko.
+  jamMasuk       String?   @db.VarChar(5)
+  jamPulang      String?   @db.VarChar(5)
+  // Toleransi telat (menit). null = ikut sekolah → toleransi umum (Setting shift_late_tolerance).
+  toleransiMenit Int?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  employee  Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  penugasan MagangPenugasan[]
-  tugas     MagangTugas[]
-  jurnal    MagangJurnal[]
-  misi      MagangMisiKiriman[]
+  employee    Employee                   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  penugasan   MagangPenugasan[]
+  tugas       MagangTugas[]
+  jurnal      MagangJurnal[]
+  misi        MagangMisiKiriman[]
+  konten      MagangKonten[]
+  kontenGrup  MagangKontenGrupAnggota[]
+  pasanganA   MagangPasangan[]           @relation("MagangPasanganA")
+  pasanganB   MagangPasangan[]           @relation("MagangPasanganB")
+  harianAnak  MagangHarianPengecualian[] @relation("MagangHarianAnak")
+  harianRekan MagangHarianPengecualian[] @relation("MagangHarianRekan")
 
   @@index([sekolah])
 }
@@ -1280,4 +1297,230 @@ model MagangMisiKiriman {
   @@index([status])
   @@index([diputusOlehId])
   @@index([diputusOlehKaryawanId])
+}
+
+// ── Pantauan guru sekolah (11 Nov 2026) ───────────────────────────────────────────────────────────
+// Tautan HANYA-BACA untuk guru pembimbing satu sekolah: /pantau/<token> + PIN (bcrypt). sekolahKunci =
+// kunciSekolah() nama sekolah (lib/services/magang/sekolah.ts) — anak yang ditampilkan dicocokkan dengan
+// sekolahSama(), bukan kesamaan teks mentah. kunciAktif = sekolahKunci selama tautan aktif, NULL sesudah
+// dicabut → indeks unik menjamin satu tautan aktif per sekolah. "Ganti tautan" = cabut yang lama + buat
+// baru (token baru). Sesi guru (cookie) memuat sidik token & sidik pinHash → cabut/ganti/ubah PIN
+// langsung mematikan sesi lama.
+model MagangPantau {
+  id                 Int       @id @default(autoincrement())
+  sekolahKunci       String    @db.VarChar(150)
+  sekolahLabel       String    @db.VarChar(150)
+  kunciAktif         String?   @unique @db.VarChar(150)
+  token              String    @unique @db.VarChar(64)
+  pinHash            String    @db.VarChar(100)
+  aktif              Boolean   @default(true)
+  kedaluwarsa        DateTime?
+  tampilLampiranIzin Boolean   @default(false)
+  terakhirDibukaAt   DateTime?
+  dibukaKali         Int       @default(0)
+  dicabutAt          DateTime?
+  dibuatOlehId       Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  dibuatOleh User? @relation("MagangPantauDibuat", fields: [dibuatOlehId], references: [id], onDelete: SetNull)
+
+  @@index([sekolahKunci])
+  @@index([dibuatOlehId])
+}
+
+// ── Jadwal konten magang (12 Nov 2026) ───────────────────────────────────────────────────────────
+// Meniru sheet pembina: satu baris = satu konten pada satu tanggal (Senin–Sabtu), dipegang SATU anak
+// (pesertaId, kode anak = MagangPeserta.kodeKonten) ATAU SATU grup (grupId) — keduanya kosong = belum
+// dibagi. Logika murni: lib/services/magang/konten.ts. Catatan & brief = MagangKontenPlatform.brief (per platform,
+// sejak 13 Nov 2026; Setting `magang_konten_brief` lama dibiarkan sebagai cadangan), pola hari = Setting `magang_konten_pola`.
+
+// Platform/akun tempat konten diposting (13 Nov 2026), mis. "Voliko Print", "Exindo". Tiap baris MagangKonten
+// milik SATU platform. brief = Catatan & brief per platform (JSON briefPlatformSchema: drive/catatan/font/
+// preset/caption/hashtag + referensi {[konsepId]: [{label,url}]}); referensi kosong → MagangKontenKonsep.referensi
+// (bawaan semua platform). Konsep/status/grup/kode/pola tetap GLOBAL. kunci = slug tetap (tidak ikut ganti nama).
+// Diarsipkan = aktif false + diarsipkanAt (disembunyikan dari tab; baris lama tetap ada).
+model MagangKontenPlatform {
+  id           Int       @id @default(autoincrement())
+  nama         String    @db.VarChar(80)
+  kunci        String    @unique @db.VarChar(60)
+  warna        String    @default("putih") @db.VarChar(20)
+  ikon         String?   @db.VarChar(40)
+  brief        Json?
+  urutan       Int       @default(0)
+  aktif        Boolean   @default(true)
+  diarsipkanAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  konten MagangKonten[]
+}
+
+// Klasifikasi konsep, mis. nama "ENTERTAIMENT" + sub "SITKOM" (ejaan pembina disimpan apa adanya).
+// warna = kunci palet (lib/services/magang/konten.ts WARNA_KONTEN) atau #rrggbb. referensi = [{label,url}].
+model MagangKontenKonsep {
+  id        Int      @id @default(autoincrement())
+  kunci     String   @unique @db.VarChar(40)
+  nama      String   @db.VarChar(60)
+  sub       String?  @db.VarChar(60)
+  warna     String   @default("putih") @db.VarChar(20)
+  referensi Json
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  konten MagangKonten[]
+}
+
+// Status konten (dropdown STATUS). anakBoleh = anak boleh memilihnya dari HP; final = dihitung selesai
+// dan HANYA pembina yang memasangnya (baris final terkunci untuk anak).
+model MagangKontenStatus {
+  id        Int      @id @default(autoincrement())
+  kunci     String   @unique @db.VarChar(40)
+  nama      String   @db.VarChar(60)
+  warna     String   @default("abu") @db.VarChar(20)
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  anakBoleh Boolean  @default(false)
+  final     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  konten MagangKonten[]
+}
+
+// Grup konten (mis. "GRUB A") — terpisah dari tim rotasi pos. urutan = urutan giliran PROMOTION (EMPATHY).
+model MagangKontenGrup {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(60)
+  warna     String   @default("merah") @db.VarChar(20)
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  anggota MagangKontenGrupAnggota[]
+  konten  MagangKonten[]
+}
+
+model MagangKontenGrupAnggota {
+  id        Int @id @default(autoincrement())
+  grupId    Int
+  pesertaId Int
+
+  grup    MagangKontenGrup @relation(fields: [grupId], references: [id], onDelete: Cascade)
+  peserta MagangPeserta    @relation(fields: [pesertaId], references: [id], onDelete: Cascade)
+
+  @@unique([grupId, pesertaId])
+  @@index([pesertaId])
+}
+
+// Satu baris jadwal konten. usulan = dibuat generator / belum disetujui pembina (lencana "Usulan").
+// urutan = urutan di hari yang sama (>1 baris per tanggal). selesaiAt diisi saat status final dipasang.
+model MagangKonten {
+  id                   Int       @id @default(autoincrement())
+  platformId           Int
+  tanggal              DateTime
+  konsepId             Int
+  pesertaId            Int?
+  grupId               Int?
+  statusId             Int
+  judul                String?   @db.VarChar(200)
+  ref                  String?   @db.VarChar(500)
+  caption              String?   @db.Text
+  linkFootage          String?   @db.VarChar(500)
+  linkEkspor           String?   @db.VarChar(500)
+  catatan              String?   @db.Text
+  usulan               Boolean   @default(false)
+  urutan               Int       @default(0)
+  diubahOlehId         Int?
+  diubahOlehKaryawanId Int?
+  selesaiAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  platform           MagangKontenPlatform @relation(fields: [platformId], references: [id], onDelete: Restrict)
+  konsep             MagangKontenKonsep   @relation(fields: [konsepId], references: [id], onDelete: Restrict)
+  peserta            MagangPeserta?       @relation(fields: [pesertaId], references: [id], onDelete: SetNull)
+  grup               MagangKontenGrup?    @relation(fields: [grupId], references: [id], onDelete: Restrict)
+  status             MagangKontenStatus   @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  diubahOleh         User?                @relation("MagangKontenDiubah", fields: [diubahOlehId], references: [id], onDelete: SetNull)
+  diubahOlehKaryawan Employee?            @relation("MagangKontenDiubahKaryawan", fields: [diubahOlehKaryawanId], references: [id], onDelete: SetNull)
+
+  @@index([tanggal])
+  @@index([platformId, tanggal])
+  @@index([pesertaId])
+  @@index([grupId])
+  @@index([konsepId])
+  @@index([statusId])
+  @@index([diubahOlehId])
+  @@index([diubahOlehKaryawanId])
+}
+
+// Jadwal harian berpasangan (14 Nov 2026): pasangan 2 anak bergantian KONTEN / PRODUKSI tiap hari kerja (Senin–Sabtu,
+// Minggu & Holiday dilewati tanpa membalik giliran). patokanTugas = tugas pada patokanTanggal. pesertaBId null = sendiri.
+// Satu anak paling banyak di SATU pasangan aktif (dijaga di service, lib/services/magang/harian.ts bentrokPasangan).
+model MagangPasangan {
+  id             Int      @id @default(autoincrement())
+  nama           String?  @db.VarChar(80)
+  pesertaAId     Int
+  pesertaBId     Int?
+  patokanTanggal DateTime
+  patokanTugas   String   @db.VarChar(10)
+  aktif          Boolean  @default(true)
+  urutan         Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pesertaA     MagangPeserta              @relation("MagangPasanganA", fields: [pesertaAId], references: [id], onDelete: Cascade)
+  pesertaB     MagangPeserta?             @relation("MagangPasanganB", fields: [pesertaBId], references: [id], onDelete: SetNull)
+  pengecualian MagangHarianPengecualian[]
+
+  @@index([pesertaAId])
+  @@index([pesertaBId])
+}
+
+// Pengecualian per tanggal dari pembina. Tingkat pasangan (pasanganId): jenis "tugas" (ganti tugas hari itu) / "libur".
+// Tingkat anak (pesertaId): "pasangan" (bekerja dengan pasanganPesertaId hari itu, tugas opsional), "tugas", "libur".
+// Pengecualian TIDAK menggeser giliran hari-hari berikutnya.
+model MagangHarianPengecualian {
+  id                Int      @id @default(autoincrement())
+  tanggal           DateTime
+  pasanganId        Int?
+  pesertaId         Int?
+  jenis             String   @db.VarChar(20)
+  tugas             String?  @db.VarChar(10)
+  pasanganPesertaId Int?
+  catatan           String?  @db.VarChar(200)
+  dibuatOlehId      Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  pasangan        MagangPasangan? @relation(fields: [pasanganId], references: [id], onDelete: Cascade)
+  peserta         MagangPeserta?  @relation("MagangHarianAnak", fields: [pesertaId], references: [id], onDelete: Cascade)
+  pasanganPeserta MagangPeserta?  @relation("MagangHarianRekan", fields: [pasanganPesertaId], references: [id], onDelete: Cascade)
+  dibuatOleh      User?           @relation("MagangHarianDibuat", fields: [dibuatOlehId], references: [id], onDelete: SetNull)
+
+  @@index([tanggal])
+  @@index([pasanganId])
+  @@index([pesertaId])
+  @@index([pasanganPesertaId])
+  @@index([dibuatOlehId])
+}
+
+// Jam kerja anak magang per SEKOLAH (15 Nov 2026) — bawaan untuk semua anak sekolah itu; MagangPeserta.jamMasuk/
+// jamPulang/toleransiMenit menimpa per anak. Hari kerja tetap Senin–Sabtu (libur dari Holiday/Minggu seperti biasa).
+// Karyawan biasa TIDAK terpengaruh: hanya peserta aktif di dalam masa magangnya (lib/services/magang/jam-kerja.ts).
+model MagangJamSekolah {
+  id             Int      @id @default(autoincrement())
+  // kunciSekolah() dari MagangPeserta.sekolah (huruf kecil, spasi dirapatkan) — satu baris per rombongan sekolah.
+  sekolahKunci   String   @unique @db.VarChar(150)
+  sekolahLabel   String   @db.VarChar(150)
+  jamMasuk       String   @db.VarChar(5)
+  jamPulang      String   @db.VarChar(5)
+  // null = toleransi umum (Setting shift_late_tolerance).
+  toleransiMenit Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

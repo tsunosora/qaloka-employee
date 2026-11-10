@@ -4,6 +4,7 @@ import { manualAttendanceSchema } from "@/lib/validators/attendance";
 import { computeAttendanceRow } from "@/lib/services/attendance/report";
 import { loadShiftConfig } from "@/lib/services/attendance/shift";
 import { jadwalEfektifDari } from "@/lib/services/jadwal-shift/efektif";
+import { muatPetaJamMagang } from "@/lib/services/magang/jam-kerja-db";
 
 function at(dateStr: string, time: string): Date {
   return new Date(`${dateStr}T${time}:00`);
@@ -33,6 +34,8 @@ export const POST = route(async (req: Request) => {
   if (scans.length === 0) return badRequest({ clockIn: ["Isi minimal jam masuk atau pulang"] });
 
   const shiftConfig = await loadShiftConfig();
+  // Anak magang berjam khusus: telat/lembur dari jam magangnya (karyawan biasa → null, tak berubah).
+  const jamMagang = (await muatPetaJamMagang(prisma, shiftConfig.lateToleranceMinutes, [employeeId])).get(employeeId, date);
   const row = computeAttendanceRow({
     employeeId,
     date,
@@ -40,6 +43,7 @@ export const POST = route(async (req: Request) => {
     // Libur nasional sengaja tidak dihitung di sini (perilaku lama); libur roster karyawan iya.
     isHoliday: hari.libur,
     shiftConfig,
+    jamMagang,
     scans: scans.map((s) => ({ scanDate: s.scanDate, scanType: s.scanType })),
   });
 

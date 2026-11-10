@@ -3,6 +3,7 @@ import { buildReport, shouldEmitDate, type DayInput } from "./report";
 import { loadShiftConfig } from "./shift";
 import { getSetting } from "@/lib/settings";
 import { jadwalEfektifDari } from "@/lib/services/jadwal-shift/efektif";
+import { muatPetaJamMagang } from "@/lib/services/magang/jam-kerja-db";
 
 function dateKey(d: Date): string {
   const y = d.getFullYear();
@@ -83,6 +84,8 @@ export async function aggregateAttendance(
   const autoSunday = (await getSetting("auto_sunday_holiday")) === "true";
   const shiftConfig = await loadShiftConfig();
   const jadwal = await jadwalEfektifDari(prisma, employees, startStr, endStr);
+  // Jam kerja khusus anak magang (peserta aktif dalam masanya). Karyawan biasa → null → perhitungan tak berubah.
+  const jamMagang = await muatPetaJamMagang(prisma, shiftConfig.lateToleranceMinutes, employees.map((e) => e.id));
 
   const byEmpDate = new Map<string, typeof attendances>();
   for (const a of attendances) {
@@ -119,6 +122,7 @@ export async function aggregateAttendance(
         schedule: hari.schedule,
         isHoliday,
         shiftConfig,
+        jamMagang: jamMagang.get(emp.id, date),
         scans: scans.map((s) => ({
           scanDate: s.scanDate,
           scanType: s.scanType,

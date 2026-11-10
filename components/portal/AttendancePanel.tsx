@@ -2,6 +2,7 @@
 
 import { Card, Empty, StatusBadge, hm, shortDate } from "./ui";
 import type { Overview } from "./types";
+import { JamKerjaMagang } from "./JamKerjaMagang";
 
 /** Rincian absensi harian satu periode. */
 export function AttendancePanel({ data }: { data: Overview }) {
@@ -9,6 +10,11 @@ export function AttendancePanel({ data }: { data: Overview }) {
 
   return (
     <Card title={`Absensi harian — ${data.period.label}`}>
+      {data.jamKerja && (
+        <div className="mb-3">
+          <JamKerjaMagang jam={data.jamKerja} />
+        </div>
+      )}
       {rows.length === 0 ? (
         <Empty>Belum ada data absensi di periode ini.</Empty>
       ) : (
@@ -26,6 +32,7 @@ export function AttendancePanel({ data }: { data: Overview }) {
                   <span>Pulang {r.clockOut ?? "—"}</span>
                   {r.lateMinutes > 0 && <span className="text-warning">Telat {hm(r.lateMinutes)}</span>}
                   {r.overtimeMinutes > 0 && <span className="text-info">Lembur {hm(r.overtimeMinutes)}</span>}
+                  {(r.pulangAwalMinutes ?? 0) > 0 && <span className="text-warning">Pulang awal {hm(r.pulangAwalMinutes ?? 0)}</span>}
                 </div>
                 {r.absenceReason && (
                   <p className="mt-1.5 text-xs italic text-subtle">“{r.absenceReason}”</p>
@@ -63,6 +70,9 @@ export function AttendancePanel({ data }: { data: Overview }) {
                     </td>
                     <td className="py-2">
                       <StatusBadge status={r.status} />
+                      {(r.pulangAwalMinutes ?? 0) > 0 && (
+                        <div className="mt-0.5 text-[11px] text-warning">Pulang awal {hm(r.pulangAwalMinutes ?? 0)}</div>
+                      )}
                       {r.absenceReason && (
                         <div className="mt-0.5 text-[11px] italic text-subtle">“{r.absenceReason}”</div>
                       )}

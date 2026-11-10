@@ -77,6 +77,8 @@ export const ATURAN_API: readonly Aturan[] = [
   // Pembimbing menilai/mengecek anak di posnya dari halaman pribadinya (8 Nov 2026).
   { awalan: "/api/public/portal/*/bimbingan", fitur: "hr.assessment" },
   { awalan: "/api/public/daftar-magang", fitur: "hr.assessment" },
+  // Pantauan guru sekolah (11 Nov 2026): tautan hanya-baca + PIN per sekolah — bagian program magang.
+  { awalan: "/api/public/pantau", fitur: "hr.assessment" },
 
   { awalan: "/api/public/employee", fitur: "hr.guest_rating" },
   { awalan: "/api/public/portal", fitur: "hr.portal" },
@@ -101,6 +103,7 @@ export const ATURAN_HALAMAN: readonly Aturan[] = [
   { awalan: "/reports", fitur: "hr.assessment" },
   { awalan: "/magang", fitur: "hr.assessment" },
   { awalan: "/daftar-magang", fitur: "hr.assessment" },
+  { awalan: "/pantau", fitur: "hr.assessment" },
   { awalan: "/settings/work-schedules", fitur: "hr.schedule" },
   { awalan: "/rate", fitur: "hr.guest_rating" },
   { awalan: "/me", fitur: "hr.portal" },
@@ -149,6 +152,7 @@ export const METODE_BACA = new Set(["GET", "HEAD", "OPTIONS"]);
  * - lisensi: SATU-SATUNYA jalan keluar — menyegarkan kunci sesudah membayar.
  * - notifikasi: menandai sudah dibaca tidak mengubah data usaha apa pun.
  * - sesi portal karyawan: itu masuk dengan PIN, bukan menulis data.
+ * - masuk/keluar pantauan guru sekolah: alasannya sama (hanya mencatat waktu dibuka).
  * - absen lewat HP: data kehadiran, alasannya sama dengan scan mesin di bawah.
  * - absen tim oleh PIC (buka sesi + catat absen anggota): data kehadiran juga. Pendaftaran
  *   freelance (`tim/freelance`) SENGAJA tidak — itu membuat data karyawan baru.
@@ -163,6 +167,8 @@ const JALUR_BEBAS_HANYA_BACA: readonly RegExp[] = [
   /^\/api\/lisensi(\/|$)/,
   /^\/api\/notifications(\/|$)/,
   /^\/api\/public\/portal\/[^/]+\/session$/,
+  // Guru masuk/keluar dengan PIN di pantauan sekolah — sama dengan sesi portal (hanya mencatat "dibuka").
+  /^\/api\/public\/pantau\/[^/]+\/(masuk|keluar)$/,
   /^\/api\/public\/absen\/[^/]+\/(session|absen)$/,
   /^\/api\/public\/absen\/[^/]+\/tim\/(sesi|absen|rekap)$/,
 ];

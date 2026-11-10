@@ -6,6 +6,7 @@ import { Card, Stat, Empty, hm, rupiah, soft } from "./ui";
 import { WorkChart } from "./WorkChart";
 import { DisciplineCard } from "./DisciplineCard";
 import { DailyOutputPanel } from "./DailyOutputPanel";
+import { JamKerjaMagang } from "./JamKerjaMagang";
 import type { Overview } from "./types";
 
 /** Ringkasan satu periode: kehadiran, skor, feedback tamu, dan estimasi lembur. */
@@ -16,6 +17,7 @@ export function OverviewPanel({ data }: { data: Overview }) {
 
   return (
     <div className="space-y-4">
+      {data.jamKerja && <JamKerjaMagang jam={data.jamKerja} />}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
           label="Kehadiran"

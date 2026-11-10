@@ -41,6 +41,8 @@ export type AttendanceRow = {
   absenceReason: string | null;
   workedMinutes: number;
   output: DailyOutput | null;
+  /** Anak magang berjam khusus: menit pulang sebelum jam pulang. */
+  pulangAwalMinutes?: number;
 };
 
 export type DailyOutput = {
@@ -179,6 +181,8 @@ export type Overview = {
   pospro: PosproKpi | null;
   discipline: Discipline;
   outputTotals: OutputTotals | null;
+  /** Anak magang berjam khusus: jam yang dipakai menghitung telat (mis. "09.00–17.00"). */
+  jamKerja?: { label: string; masuk: string; pulang: string; toleransiMenit: number } | null;
 };
 
 export type LeaveRequestItem = {
